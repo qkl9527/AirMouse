@@ -48,6 +48,12 @@ python一键启动，无需安装手机客户端。
 
 ## 🚀 快速启动
 
+电脑端现在是独立子项目。先在仓库根目录切换到 `desktop/`，再执行本页的命令：
+
+```bash
+cd desktop
+```
+
 ### 使用 uv（推荐）
 
 先根据 [uv 官方安装说明](https://docs.astral.sh/uv/getting-started/installation/)安装 uv，然后在项目根目录运行：
@@ -112,7 +118,7 @@ PowerShell 可先运行 `$env:AIRMOUSE_HTTP = "1"`，然后执行 `uv run python
 ### 其他启动方式
 
 * Windows 桌面托盘：安装 Python 3.11 后双击 `AirMouseserver.bat`，脚本会检查依赖并启动服务。首次检查会生成 `deps_ok.txt`；需要重新检查时删除此文件。
-* 手动使用系统 Python：`python -m pip install -r requirments.txt`，然后运行 `python server.py`。
+* 手动使用系统 Python：`python -m pip install -r requirements.txt`，然后运行 `python server.py`。
 * 添加或移除项目依赖：使用 `uv add 包名` 或 `uv remove 包名`，并保持 `pyproject.toml` 与 `uv.lock` 同步。
 * 安装打包用的可选开发依赖：`uv sync --extra dev`。
 

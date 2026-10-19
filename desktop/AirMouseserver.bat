@@ -7,7 +7,7 @@ if exist "%DEPS_FLAG%" (
     echo dependencies already verified, skipping package check.
 ) else (
     echo checking python dependencies...
-    pip install -r requirments.txt
+    pip install -r requirements.txt
     if errorlevel 1 (
         echo dependency check failed.
         pause

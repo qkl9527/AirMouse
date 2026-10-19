@@ -15,7 +15,7 @@ if errorlevel 1 (
 )
 
 echo [1/4] Installing build dependencies...
-python -m pip install -r requirments.txt pyinstaller
+python -m pip install -r requirements.txt pyinstaller
 if errorlevel 1 (
     echo [ERROR] failed to install dependencies.
     pause

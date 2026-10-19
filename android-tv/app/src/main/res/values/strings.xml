@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">AirMouse 电视版</string>
+    <string name="setup_title">手机控制这台电视</string>
+    <string name="setup_intro">确保手机和电视连接到同一个 Wi-Fi 或局域网，然后用手机扫码打开触控板。</string>
+    <string name="accessibility_title">AirMouse-电视控制服务</string>
+    <string name="accessibility_description">开启后，AirMouse 可以在电视应用间移动指针、点击、滚动和导航。请只在你信任本应用时启用。</string>
+    <string name="enable_accessibility">开启 AirMouse-电视控制服务</string>
+    <string name="input_method_title">AirMouse-手机键盘输入</string>
+    <string name="input_method_description">启用 AirMouse 输入法后，可在电视搜索框中直接提交手机输入的整段文字。</string>
+    <string name="enable_input_method">设置 AirMouse 输入法</string>
+    <string name="server_waiting">请先启用 AirMouse-电视控制服务，然后重新打开此页面。</string>
+    <string name="server_ready">扫码后在手机浏览器中使用触控板、快捷键和键盘。</string>
+    <string name="service_enabled">AirMouse-电视控制服务：已启用</string>
+    <string name="service_disabled">AirMouse-电视控制服务：尚未启用</string>
+    <string name="input_method_enabled">AirMouse-手机键盘输入：已启用</string>
+    <string name="input_method_disabled">AirMouse-手机键盘输入：尚未启用</string>
+    <string name="input_method_selected">AirMouse-手机键盘输入：当前已选中</string>
+    <string name="connected_count">手机连接数：%1$d</string>
+    <string name="no_network">未发现局域网地址，请检查电视的网络连接。</string>
+    <string name="pairing_url">手机访问地址：%1$s</string>
+    <string name="input_method_view">AirMouse 输入法已就绪。请在手机端输入文字并发送到电视。</string>
+</resources>
