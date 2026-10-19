@@ -67,6 +67,10 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
         }
     }
 
+    override fun onPartyState(state: org.json.JSONObject) {
+        mainHandler.post { overlay.updatePartyState(state) }
+    }
+
     private fun dispatch(action: RemoteAction) {
         when (action) {
             is RemoteAction.Move -> movePointer(action.dx, action.dy)
@@ -78,7 +82,67 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
             is RemoteAction.Text -> {
                 if (!RemoteInputBridge.commitText(action.value)) setFocusedText(action.value)
             }
+            is RemoteAction.EnableAirMouse -> Unit // ControlServer 在网络线程为请求客户端建立 TLS 通道。
+            is RemoteAction.ListApps -> Unit // 应用列表由 ControlServer 按请求连接返回。
+            is RemoteAction.LaunchApp -> launchApp(action)
+            is RemoteAction.SceneText -> sendSceneText(action)
+            is RemoteAction.JoinParty,
+            is RemoteAction.StartQuiz,
+            is RemoteAction.Buzz,
+            is RemoteAction.StartVote,
+            is RemoteAction.Vote,
+            is RemoteAction.EndParty -> Unit // 同乐命令由 ControlServer/PartyRoom 原子处理。
+            is RemoteAction.CursorStyle -> overlay.updateCursorStyle(action.style)
         }
+    }
+
+    private fun launchApp(action: RemoteAction.LaunchApp) {
+        val launchIntent = packageManager.getLaunchIntentForPackage(action.packageName)
+        if (launchIntent == null) {
+            ControlServer.notifyActionResult(action.requestId, false, "电视上找不到这个可启动的 App。")
+            return
+        }
+        runCatching {
+            // 无障碍服务不属于 Activity，上屏打开第三方 App 时必须加 NEW_TASK。
+            launchIntent.addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK)
+            startActivity(launchIntent)
+        }.onSuccess {
+            ControlServer.notifyActionResult(action.requestId, true, "电视 App 已打开。")
+        }.onFailure {
+            ControlServer.notifyActionResult(action.requestId, false, "电视系统暂时不允许从 AirMouse 打开这个 App。")
+        }
+    }
+
+    /**
+     * 场景只在目标 App 已成为当前窗口、且它明确暴露了可编辑焦点时才输入片名。
+     * 许多视频 App 打开后停在首页；此时宁可提示用户先进入搜索框，也不能把文字
+     * 误发到仍在前台的其他页面。
+     */
+    private fun sendSceneText(action: RemoteAction.SceneText) {
+        val root = rootInActiveWindow
+        if (root == null || root.packageName?.toString() != action.packageName) {
+            root?.recycle()
+            ControlServer.notifyActionResult(action.requestId, false, "电视 App 已打开，但当前页面还没就绪；请先进入它的搜索框再试。")
+            return
+        }
+        val focusedInput = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        val editable = focusedInput?.isEditable == true
+        val committed = editable && RemoteInputBridge.commitText(action.value)
+        val filled = if (committed) true else if (editable) {
+            focusedInput?.performAction(
+                AccessibilityNodeInfo.ACTION_SET_TEXT,
+                Bundle().apply {
+                    putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, action.value)
+                },
+            ) == true
+        } else false
+        focusedInput?.recycle()
+        root.recycle()
+        ControlServer.notifyActionResult(
+            action.requestId,
+            filled,
+            if (filled) "搜索内容已发送。" else "电视 App 已打开，但没有可输入的搜索框；请先进入搜索再试。",
+        )
     }
 
     private fun movePointer(dx: Float, dy: Float) {

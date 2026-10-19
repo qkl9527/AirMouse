@@ -23,8 +23,16 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    // Bouncy Castle 的多个模块都带有相同的许可文本；APK 中只需保留一份。
+    packaging {
+        resources {
+            excludes += "META-INF/LICENSE.md"
+        }
+    }
 }
 
 dependencies {
     implementation("com.google.zxing:core:3.5.4")
+    implementation("org.bouncycastle:bcpkix-jdk18on:1.86")
 }

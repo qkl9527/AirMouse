@@ -24,6 +24,7 @@ class MainActivity : Activity() {
     private lateinit var serverState: TextView
     private lateinit var clientState: TextView
     private lateinit var addressState: TextView
+    private lateinit var tlsFingerprintState: TextView
     private lateinit var qrImage: ImageView
     private var renderedQrUrl: String? = null
 
@@ -82,9 +83,11 @@ class MainActivity : Activity() {
         serverState = text("", 18f, 0xFF76E7AC.toInt(), true)
         clientState = text("", 16f, 0xFFD5DCE2.toInt(), false)
         addressState = text("", 15f, 0xFF9EABB6.toInt(), false)
+        tlsFingerprintState = text("", 13f, 0xFF9EABB6.toInt(), false)
         instructions.addView(serverState, matchWrap())
         instructions.addView(clientState, matchWrap())
         instructions.addView(addressState, matchWrap())
+        instructions.addView(tlsFingerprintState, matchWrap())
 
         root.addView(instructions, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1.4f))
         root.addView(spacer(32, true))
@@ -154,6 +157,8 @@ class MainActivity : Activity() {
         serverState.text = status.message ?: getString(R.string.server_ready)
         clientState.text = getString(R.string.connected_count, status.clientCount)
         addressState.text = status.pairingUrl?.let { getString(R.string.pairing_url, it) }.orEmpty()
+        tlsFingerprintState.text = status.secureFingerprint?.let { "空中飞鼠证书指纹（请与手机页面核对）\n$it" }.orEmpty()
+        tlsFingerprintState.visibility = if (status.secureFingerprint.isNullOrBlank()) View.GONE else View.VISIBLE
 
         if (status.pairingUrl.isNullOrBlank()) {
             qrImage.visibility = View.INVISIBLE

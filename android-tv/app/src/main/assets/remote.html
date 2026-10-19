@@ -6,130 +6,310 @@
   <meta name="theme-color" content="#101316">
   <title>AirMouse 电视飞鼠</title>
   <style>
-    :root { color-scheme: dark; font-family: -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; --bg:#101316; --card:#191f23; --soft:#232c31; --line:#303b40; --green:#76e7ac; --text:#eef5f2; --muted:#9aa9a4; }
+    :root {
+      color-scheme: dark;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      --bg:#101316; --surface:#191f23; --surface-raised:#232c31; --line:#303b40;
+      --mint:#76e7ac; --text:#eef5f2; --muted:#9aa9a4; --warning:#e7b36e;
+    }
     * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-    body { margin:0; background:var(--bg); color:var(--text); min-height:100dvh; overscroll-behavior:none; }
-    button,select,textarea { font:inherit; color:inherit; }
-    button { border:1px solid var(--line); background:var(--soft); border-radius:14px; min-height:48px; padding:0 15px; font-weight:650; touch-action:manipulation; }
-    button:active { transform:scale(.97); border-color:var(--green); }
-    .app { max-width:760px; margin:auto; padding:calc(14px + env(safe-area-inset-top)) 16px calc(22px + env(safe-area-inset-bottom)); }
-    header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; }
-    .brand { font-weight:800; letter-spacing:.2px; font-size:18px; }
-    .status { display:flex; align-items:center; gap:7px; color:var(--muted); font-size:13px; }
-    .dot { width:9px; height:9px; border-radius:50%; background:#e5a76c; }
-    .status.online { color:var(--green); } .status.online .dot { background:var(--green); box-shadow:0 0 10px #76e7ac88; }
-    .tabs { display:grid; grid-template-columns:1fr 1fr; background:var(--card); padding:4px; border-radius:15px; margin-bottom:14px; }
-    .tab { border:0; background:transparent; min-height:42px; color:var(--muted); }
-    .tab.active { background:#2a3934; color:var(--green); }
+    html, body { margin:0; min-height:100%; background:var(--bg); color:var(--text); }
+    body { min-height:100dvh; overscroll-behavior:none; }
+    button, input, textarea, select { color:inherit; font:inherit; }
+    button { min-height:46px; padding:0 14px; border:1px solid var(--line); border-radius:14px; background:var(--surface-raised); font-weight:650; touch-action:manipulation; }
+    button:active { transform:scale(.975); border-color:var(--mint); }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline:2px solid var(--mint); outline-offset:2px; }
+    .app { width:min(100%,760px); min-height:100dvh; margin:auto; padding:calc(10px + env(safe-area-inset-top)) 16px calc(82px + env(safe-area-inset-bottom)); }
+    .topbar { display:flex; min-height:44px; justify-content:space-between; align-items:center; gap:10px; }
+    .brand { overflow:hidden; font-size:17px; font-weight:800; letter-spacing:.1px; text-overflow:ellipsis; white-space:nowrap; }
+    .top-actions { display:flex; align-items:center; gap:8px; }
+    .status { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:12px; white-space:nowrap; }
+    .status-dot { width:8px; height:8px; flex:none; border-radius:50%; background:var(--warning); }
+    .status.online { color:var(--mint); } .status.online .status-dot { background:var(--mint); box-shadow:0 0 9px #76e7ac88; }
+    .icon-button { width:44px; min-width:44px; min-height:44px; padding:0; font-size:20px; }
+    .view { display:none; } .view.active { display:block; }
+    .remote-view { padding-top:13px; }
+    .mode-switch { display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:4px; margin-bottom:10px; border-radius:15px; background:var(--surface); }
+    .mode-button { min-height:40px; border:0; background:transparent; color:var(--muted); }
+    .mode-button.active { background:#2a3934; color:var(--mint); }
+    .pad { height:clamp(250px,48dvh,410px); min-height:0; position:relative; overflow:hidden; border:1px solid #34413e; border-radius:25px; background:radial-gradient(ellipse at 50% 42%,#202b29,#171d20 72%); touch-action:none; user-select:none; }
+    .pad::after { content:attr(data-hint); position:absolute; right:14px; bottom:16px; left:14px; color:#9aa9a4; font-size:13px; text-align:center; pointer-events:none; }
+    .pad-cross { width:38px; height:38px; position:absolute; inset:0; margin:auto; border:1px solid #76e7ac55; border-radius:50%; pointer-events:none; }
+    .pad-cross::before, .pad-cross::after { content:""; position:absolute; background:#76e7ac55; }
+    .pad-cross::before { width:1px; height:54px; top:-9px; left:18px; }
+    .pad-cross::after { width:54px; height:1px; top:18px; left:-9px; }
+    .pad-air { display:none; position:absolute; inset:0; align-items:center; justify-content:center; flex-direction:column; gap:8px; overflow:auto; padding:18px 20px; background:#101316ee; text-align:center; }
+    .pad-air strong { font-size:19px; } .pad-air span { max-width:250px; color:var(--muted); font-size:13px; line-height:1.5; }
+    .trust-steps { display:none; max-width:290px; color:var(--muted); font-size:12px; line-height:1.45; text-align:left; }
+    .trust-steps p { margin:7px 0; }
+    .trust-steps a { display:block; margin:8px 0; color:var(--mint); text-align:center; }
+    .quick-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:10px; }
+    .quick-row button { min-width:0; padding:0 5px; font-size:13px; }
+    .quick-row .main-action { border-color:var(--mint); background:var(--mint); color:#102017; }
+    .more-controls { width:100%; min-height:40px; margin-top:8px; border:0; background:transparent; color:var(--muted); font-size:13px; }
+    .view-heading { margin:24px 0 5px; font-size:23px; letter-spacing:-.3px; }
+    .view-subtitle { margin:0 0 18px; color:var(--muted); font-size:14px; line-height:1.5; }
+    .feature-card { padding:18px; border:1px solid #263136; border-radius:20px; background:var(--surface); }
+    .feature-card + .feature-card { margin-top:12px; }
+    .feature-card h2 { margin:0 0 6px; font-size:17px; }
+    .feature-card p { margin:0; color:var(--muted); font-size:13px; line-height:1.5; }
+    .feature-card button { margin-top:15px; }
+    .accent { border-color:var(--mint); background:var(--mint); color:#102017; }
+    .empty-symbol { width:52px; height:52px; display:grid; place-items:center; margin-bottom:14px; border:1px solid #345348; border-radius:17px; background:#20362d; color:var(--mint); font-size:23px; }
+    .scene-list { display:grid; gap:10px; }
+    .scene-item { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; padding:14px; border:1px solid #263136; border-radius:16px; background:var(--surface); }
+    .scene-item .button-row { width:100%; margin-top:0; }
+    .scene-item button { min-height:40px; padding:0 8px; font-size:12px; }
     .panel { display:none; } .panel.active { display:block; }
-    .pad { height:min(51dvh,430px); min-height:240px; border-radius:24px; border:1px solid #34413e; background:radial-gradient(ellipse at 50% 45%,#202b29,#171d20 70%); position:relative; overflow:hidden; touch-action:none; user-select:none; }
-    .pad::after { content:"在这里滑动，电视上的指针会跟着移动"; position:absolute; bottom:18px; width:100%; text-align:center; font-size:13px; color:#84938d; pointer-events:none; }
-    .pad-cross { position:absolute; inset:0; margin:auto; width:36px; height:36px; border:1px solid #76e7ac55; border-radius:50%; pointer-events:none; }
-    .pad-cross::before,.pad-cross::after { content:""; position:absolute; background:#76e7ac55; }
-    .pad-cross::before { width:1px; height:52px; left:17px; top:-9px; }
-    .pad-cross::after { height:1px; width:52px; top:17px; left:-9px; }
-    .row { display:flex; gap:9px; margin-top:10px; } .row > * { flex:1; }
-    .accent { background:var(--green); color:#102017; border-color:var(--green); }
-    .toggle.on { border-color:var(--green); color:var(--green); background:#20362d; }
-    .section { background:var(--card); border:1px solid #232d30; border-radius:18px; padding:13px; margin-top:13px; }
-    .section-title { font-size:13px; color:var(--muted); margin:0 0 10px 2px; }
-    .shortcuts { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
-    select { width:100%; min-height:38px; border:1px solid var(--line); border-radius:10px; background:#14191c; padding:0 8px; font-size:12px; }
-    .dpad { width:210px; height:210px; margin:18px auto; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); gap:6px; }
-    .dpad button { min-width:0; padding:0; font-size:20px; border-radius:17px; }
-    .dpad .ok { background:#2a3934; color:var(--green); font-size:14px; }
-    .text-box { width:100%; min-height:112px; resize:vertical; border:1px solid var(--line); border-radius:15px; background:#14191c; padding:13px; outline:none; }
-    .text-box:focus { border-color:var(--green); }
-    .key-row { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; margin-top:9px; }
-    .hint { color:var(--muted); font-size:12px; line-height:1.5; margin:10px 2px 0; }
-    .toast { position:fixed; left:50%; bottom:calc(24px + env(safe-area-inset-bottom)); transform:translate(-50%,20px); opacity:0; transition:.2s; background:#2b3538; border:1px solid #40504d; border-radius:20px; padding:10px 15px; font-size:13px; pointer-events:none; }
-    .toast.show { opacity:1; transform:translate(-50%,0); }
+    .field { display:grid; gap:7px; margin-top:13px; color:var(--muted); font-size:13px; }
+    .field input, .field textarea, .field select, .text-box { width:100%; min-height:46px; padding:12px; border:1px solid var(--line); border-radius:13px; background:#14191c; color:var(--text); }
+    .field textarea, .text-box { min-height:110px; resize:vertical; }
+    .button-row { display:flex; gap:8px; margin-top:12px; }
+    .button-row > * { flex:1; }
+    .choice-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; margin-top:16px; }
+    .choice-grid button { min-height:72px; text-align:left; }
+    .choice-grid strong { display:block; margin-bottom:4px; }
+    .choice-grid small { color:var(--muted); font-size:12px; font-weight:450; }
+    .party-stage { display:none; margin-top:14px; }
+    .party-stage.active { display:block; }
+    .answer-button { width:100%; min-height:115px; margin-top:14px; border-color:var(--mint); background:#20362d; color:var(--mint); font-size:24px; }
+    .option-list { display:grid; gap:9px; margin-top:14px; }
+    .option-button { display:flex; align-items:center; justify-content:space-between; text-align:left; }
+    .settings-list { display:grid; gap:10px; }
+    .setting-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 14px; border:1px solid #263136; border-radius:16px; background:var(--surface); }
+    .setting-copy strong { display:block; font-size:14px; }
+    .setting-copy small { display:block; margin-top:3px; color:var(--muted); font-size:12px; }
+    .toggle { min-width:53px; min-height:34px; padding:0 8px; border-radius:20px; }
+    .toggle[aria-pressed="true"] { border-color:var(--mint); background:#20362d; color:var(--mint); }
+    .cursor-options { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:11px; }
+    .cursor-option { display:grid; justify-items:center; gap:7px; min-height:83px; padding:11px 4px; color:var(--muted); font-size:12px; }
+    .cursor-option[aria-pressed="true"] { border-color:var(--mint); color:var(--mint); }
+    .cursor-preview { width:23px; height:23px; border:2px solid var(--mint); border-radius:50%; box-shadow:0 0 0 3px #76e7ac22; }
+    .cursor-option[data-style="blue"] .cursor-preview { border-color:#70b9ff; box-shadow:0 0 0 3px #70b9ff22; }
+    .cursor-option[data-style="amber"] .cursor-preview { border-color:#ffbf69; box-shadow:0 0 0 3px #ffbf6922; }
+    .nav { position:fixed; z-index:5; right:0; bottom:0; left:0; padding:8px 10px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid #263136; background:#101316f5; backdrop-filter:blur(16px); }
+    .nav-inner { width:min(100%,760px); display:grid; grid-template-columns:repeat(4,1fr); gap:4px; margin:auto; }
+    .nav-button { display:grid; justify-items:center; align-content:center; gap:3px; min-height:54px; padding:3px; border:0; background:transparent; color:var(--muted); font-size:11px; }
+    .nav-button .nav-icon { font-size:19px; line-height:1; }
+    .nav-button.active { color:var(--mint); }
+    .sheet-backdrop { display:none; position:fixed; z-index:10; inset:0; align-items:flex-end; background:#0009; }
+    .sheet-backdrop.open { display:flex; }
+    .sheet { width:min(100%,760px); max-height:85dvh; overflow:auto; margin:auto auto 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); border:1px solid #303b40; border-bottom:0; border-radius:24px 24px 0 0; background:#171d20; }
+    .sheet-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+    .sheet-head h2 { margin:0; font-size:18px; }
+    .sheet-head button { min-height:40px; }
+    .text-box { display:block; }
+    .dpad { width:min(100%,260px); aspect-ratio:1; display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); gap:7px; margin:12px auto; }
+    .dpad button { min-width:0; min-height:0; padding:0; border-radius:17px; font-size:22px; }
+    .dpad .ok { background:#2a3934; color:var(--mint); font-size:14px; }
+    .shortcuts { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:12px; }
+    .shortcuts select { min-width:0; min-height:40px; border:1px solid var(--line); border-radius:10px; background:#14191c; font-size:11px; }
+    .shortcut-buttons { display:grid; grid-template-columns:repeat(4,1fr); gap:7px; margin-top:7px; }
+    .shortcut-buttons button { min-width:0; padding:0 4px; font-size:12px; }
+    .toast { position:fixed; z-index:20; right:18px; bottom:calc(78px + env(safe-area-inset-bottom)); left:18px; width:max-content; max-width:calc(100% - 36px); margin:auto; padding:10px 15px; transform:translateY(10px); border:1px solid #40504d; border-radius:18px; background:#2b3538; font-size:13px; opacity:0; pointer-events:none; transition:opacity .18s, transform .18s; }
+    .toast.show { transform:translateY(0); opacity:1; }
+    .hint { margin:12px 2px 0; color:var(--muted); font-size:12px; line-height:1.5; }
+    @media (max-height:680px) {
+      .app { padding-top:calc(5px + env(safe-area-inset-top)); }
+      .remote-view { padding-top:6px; }
+      .pad { height:43dvh; min-height:210px; }
+      .quick-row { margin-top:7px; }
+    }
+    @media (min-width:700px) {
+      .app { padding-right:24px; padding-left:24px; }
+      .pad { height:min(55dvh,480px); }
+    }
+    @media (prefers-reduced-motion:reduce) { *, *::before, *::after { scroll-behavior:auto !important; transition:none !important; } }
   </style>
 </head>
 <body>
   <main class="app">
-    <header>
+    <header class="topbar">
       <div class="brand">AirMouse · 电视飞鼠</div>
-      <div id="status" class="status"><span class="dot"></span><span id="statusText">正在连接电视…</span></div>
+      <div class="top-actions">
+        <div id="status" class="status"><span class="status-dot"></span><span id="statusText">正在连接…</span></div>
+        <button id="fullscreenButton" class="icon-button" type="button" aria-label="进入全屏" title="全屏">⛶</button>
+      </div>
     </header>
-    <nav class="tabs">
-      <button class="tab active" data-panel="mouse">触控板</button>
-      <button class="tab" data-panel="keyboard">键盘输入</button>
-    </nav>
 
-    <section id="mouse" class="panel active">
-      <div id="pad" class="pad" aria-label="电视触控板"><div class="pad-cross"></div></div>
-      <div class="row">
-        <button id="singleClick">单击</button>
-        <button id="doubleClick">双击</button>
-        <button id="dragToggle" class="toggle">拖动模式：关</button>
+    <section id="view-remote" class="view remote-view active" data-view="remote">
+      <div class="mode-switch" role="group" aria-label="控制方式">
+        <button class="mode-button active" type="button" data-mode="touch">触控板</button>
+        <button class="mode-button" type="button" data-mode="air">空中飞鼠</button>
       </div>
-      <div class="row">
-        <button data-key="volume_down">音量 −</button>
-        <button data-key="volume_up">音量 +</button>
-        <button data-key="mute">静音</button>
-      </div>
-      <div class="row">
-        <button id="scrollUp">向上滚动</button>
-        <button id="scrollDown">向下滚动</button>
-      </div>
-      <div class="section">
-        <p class="section-title">自定义快捷键（选一个动作绑定到每个按钮）</p>
-        <div class="shortcuts">
-          <select aria-label="快捷键一" data-slot="0"></select>
-          <select aria-label="快捷键二" data-slot="1"></select>
-          <select aria-label="快捷键三" data-slot="2"></select>
-          <select aria-label="快捷键四" data-slot="3"></select>
+      <div id="pad" class="pad" aria-label="电视触控板" data-hint="在这里滑动，电视指针会跟着移动">
+        <div class="pad-cross"></div>
+        <div id="padAirState" class="pad-air">
+          <strong>空中飞鼠</strong>
+          <span id="airHint">启用后，抬起手机指向电视即可控制指针。</span>
+          <div id="trustSteps" class="trust-steps">
+            <p><b>只需设置一次：</b>先下载电视的本地信任证书，再按手机系统说明安装并信任它。证书只用于这台电视的局域网 HTTPS。</p>
+            <a id="certificateDownload" href="#" download="airmouse-tv-ca.crt">下载电视信任证书</a>
+            <p><b>iPhone：</b>在“设置 → 已下载描述文件”安装，再到“通用 → 关于本机 → 证书信任设置”开启完整信任。</p>
+            <p><b>Android：</b>在“设置 → 安全 → 加密与凭据 → 安装证书”中安装 CA 证书，然后回到此页。</p>
+          </div>
+          <button id="enableAirButton" class="accent" type="button" disabled>开始设置</button>
+          <button id="continueSecureButton" type="button" style="display:none">我已信任，继续</button>
         </div>
-        <div class="row" id="shortcutButtons"></div>
       </div>
-      <div class="section">
-        <p class="section-title">方向遥控</p>
-        <div class="dpad">
-          <span></span><button data-key="up" aria-label="上">↑</button><span></span>
-          <button data-key="left" aria-label="左">←</button><button class="ok" data-key="ok">确认</button><button data-key="right" aria-label="右">→</button>
-          <span></span><button data-key="down" aria-label="下">↓</button><span></span>
-        </div>
-        <div class="row"><button data-key="back">返回</button><button data-key="home">主页</button><button data-key="play_pause">播放 / 暂停</button></div>
+      <div class="quick-row">
+        <button id="clickButton" class="main-action" type="button">点击</button>
+        <button id="doubleButton" type="button">双击</button>
+        <button data-key="volume_down" type="button" aria-label="音量减小">音量 −</button>
+        <button data-key="volume_up" type="button" aria-label="音量增加">音量 +</button>
       </div>
-      <p class="hint">电视端需要开启“AirMouse-电视控制服务”。普通 App 使用系统触屏手势模拟鼠标；某些只支持遥控器的应用，请用方向键导航。</p>
+      <button id="moreControlsButton" class="more-controls" type="button">方向键、键盘和更多遥控　⌃</button>
     </section>
 
-    <section id="keyboard" class="panel">
-      <div class="section">
-        <p class="section-title">在手机键盘输入，再发送到电视当前输入框</p>
-        <textarea id="textInput" class="text-box" autocomplete="off" autocapitalize="off" placeholder="输入电视搜索内容…"></textarea>
-        <div class="row"><button id="sendText" class="accent">发送文字</button><button id="searchText">发送并搜索 ↵</button><button id="clearText">清空</button></div>
-        <p class="hint">要在电视搜索框中直接上屏，请先启用并选中 AirMouse 输入法；支持的输入框也可以使用无障碍文字填充。</p>
+    <section id="view-scenes" class="view" data-view="scenes">
+      <h1 class="view-heading">追剧场景</h1>
+      <p class="view-subtitle">常看的节目，设成一个按钮就能打开和搜索。</p>
+      <div id="sceneEmpty" class="feature-card">
+        <div class="empty-symbol" aria-hidden="true">▶</div>
+        <h2>让下一集更近一步</h2>
+        <p>选一个电视 App，写下片名。AirMouse 会打开 App；搜索框就绪时自动填入片名，没就绪会提醒你继续。</p>
+        <button id="newSceneButton" class="accent" type="button">创建追剧按钮</button>
       </div>
-      <div class="section">
-        <p class="section-title">常用按键</p>
-        <div class="key-row">
-          <button data-key="back">返回</button><button data-key="enter">回车</button><button data-key="backspace">删除</button><button data-key="space">空格</button>
-          <button data-key="left">←</button><button data-key="up">↑</button><button data-key="down">↓</button><button data-key="right">→</button>
+      <div id="sceneEditor" class="feature-card panel" aria-label="创建追剧场景">
+        <h2>创建追剧按钮</h2>
+        <label class="field">按钮名称<input id="sceneName" maxlength="32" placeholder="例如：继续看《漫长的季节》"></label>
+        <label class="field">电视 App<select id="sceneApp"><option value="">正在读取电视 App…</option></select></label>
+        <label class="field">搜索片名<input id="sceneQuery" maxlength="100" placeholder="输入片名"></label>
+        <label class="setting-row"><span class="setting-copy"><strong>输入后按回车搜索</strong><small>打开 App 后将片名提交给电视</small></span><input id="scenePressEnter" type="checkbox" checked></label>
+        <label class="setting-row"><span class="setting-copy"><strong>搜索后开始播放</strong><small>第三方 App 是否支持取决于它自己的界面</small></span><input id="scenePlayAfter" type="checkbox"></label>
+        <div class="button-row"><button id="cancelSceneButton" type="button">取消</button><button id="saveSceneButton" class="accent" type="button">保存按钮</button></div>
+      </div>
+      <div id="sceneList" class="scene-list" aria-live="polite"></div>
+    </section>
+
+    <section id="view-play" class="view" data-view="play">
+      <h1 class="view-heading">一起玩</h1>
+      <p class="view-subtitle">把手机变成客厅里的抢答器，或者一起决定看什么。</p>
+      <div id="partyChoices" class="choice-grid">
+        <button type="button" data-party="quiz"><strong>开始抢答</strong><small>出个题，看看谁手快</small></button>
+        <button type="button" data-party="vote"><strong>选片投票</strong><small>几个人一起挑今晚看的片</small></button>
+      </div>
+      <section id="quizSetup" class="feature-card party-stage" aria-label="发起抢答">
+        <h2>出一道题</h2>
+        <label class="field">问题<input id="quizQuestion" maxlength="100" placeholder="例如：今晚先看哪部？"></label>
+        <button id="startQuizButton" class="accent" type="button">开始抢答</button>
+      </section>
+      <section id="voteSetup" class="feature-card party-stage" aria-label="发起选片投票">
+        <h2>今晚候选片名</h2>
+        <label class="field">每行输入一个片名<textarea id="voteOptions" maxlength="500" placeholder="流浪地球\n星际穿越\n疯狂动物城"></textarea></label>
+        <button id="startVoteButton" class="accent" type="button">开始投票</button>
+      </section>
+      <section id="partyActive" class="feature-card party-stage" aria-live="polite">
+        <h2 id="partyTitle">等待电视同步活动…</h2>
+        <p id="partyDescription" class="hint"></p>
+        <button id="buzzButton" class="answer-button" type="button">抢答！</button>
+        <div id="partyOptions" class="option-list"></div>
+        <button id="endPartyButton" type="button">结束活动</button>
+      </section>
+    </section>
+
+    <section id="view-settings" class="view" data-view="settings">
+      <h1 class="view-heading">遥控偏好</h1>
+      <p class="view-subtitle">让光标和每次点击都更合你手。</p>
+      <div class="settings-list">
+        <div class="setting-row"><span class="setting-copy"><strong>电视光标样式</strong><small>在电视上预览指针颜色</small></span></div>
+        <div class="cursor-options">
+          <button class="cursor-option" data-style="mint" type="button" aria-pressed="true"><span class="cursor-preview"></span>薄荷绿</button>
+          <button class="cursor-option" data-style="blue" type="button" aria-pressed="false"><span class="cursor-preview"></span>晴空蓝</button>
+          <button class="cursor-option" data-style="amber" type="button" aria-pressed="false"><span class="cursor-preview"></span>暖阳橙</button>
         </div>
+        <div class="setting-row"><span class="setting-copy"><strong>点击音效</strong><small>手机发出轻提示音</small></span><button class="toggle" data-pref="sound" type="button" aria-pressed="false">关闭</button></div>
+        <div class="setting-row"><span class="setting-copy"><strong>轻震反馈</strong><small>点击时让手机轻轻震一下</small></span><button class="toggle" data-pref="vibration" type="button" aria-pressed="false">关闭</button></div>
+        <label class="setting-row"><span class="setting-copy"><strong>空中飞鼠灵敏度</strong><small>移动角度更小，光标也能快速跟上</small></span><input id="gyroSensitivity" type="range" min="2" max="14" step="0.5" value="7"></label>
       </div>
+      <p id="airPermissionStatus" class="hint">空中飞鼠仅在你主动切换后申请陀螺仪权限。</p>
     </section>
   </main>
-  <div id="toast" class="toast"></div>
+
+  <nav class="nav" aria-label="主要导航"><div class="nav-inner">
+    <button class="nav-button active" type="button" data-panel="remote"><span class="nav-icon">⌖</span><span>遥控</span></button>
+    <button class="nav-button" type="button" data-panel="scenes"><span class="nav-icon">▶</span><span>场景</span></button>
+    <button class="nav-button" type="button" data-panel="play"><span class="nav-icon">✦</span><span>同乐</span></button>
+    <button class="nav-button" type="button" data-panel="settings"><span class="nav-icon">⚙</span><span>设置</span></button>
+  </div></nav>
+
+  <div id="controlsBackdrop" class="sheet-backdrop" aria-hidden="true">
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="controlsTitle">
+      <div class="sheet-head"><h2 id="controlsTitle">常用遥控</h2><button id="closeControlsButton" type="button" aria-label="关闭">完成</button></div>
+      <div class="dpad" aria-label="方向遥控">
+        <span></span><button data-key="up" aria-label="上" type="button">↑</button><span></span>
+        <button data-key="left" aria-label="左" type="button">←</button><button class="ok" data-key="ok" type="button">确认</button><button data-key="right" aria-label="右" type="button">→</button>
+        <span></span><button data-key="down" aria-label="下" type="button">↓</button><span></span>
+      </div>
+      <div class="button-row"><button data-key="back" type="button">返回</button><button data-key="home" type="button">主页</button><button data-key="play_pause" type="button">播放 / 暂停</button></div>
+      <div class="button-row"><button id="openKeyboardButton" type="button">手机键盘输入</button><button id="dragToggle" type="button" aria-pressed="false">拖动模式：关</button></div>
+      <p class="hint">电视搜索时，先在电视 App 打开输入框，再用手机键盘输入。</p>
+    </section>
+  </div>
+
+  <div id="keyboardBackdrop" class="sheet-backdrop" aria-hidden="true">
+    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="keyboardTitle">
+      <div class="sheet-head"><h2 id="keyboardTitle">手机键盘输入</h2><button id="closeKeyboardButton" type="button" aria-label="关闭">完成</button></div>
+      <textarea id="textInput" class="text-box" autocomplete="off" autocapitalize="off" placeholder="输入电视搜索内容…"></textarea>
+      <div class="button-row"><button id="sendTextButton" type="button">发送文字</button><button id="searchTextButton" class="accent" type="button">发送并搜索</button></div>
+      <div class="shortcuts" id="shortcutSelects"></div>
+      <div class="shortcut-buttons" id="shortcutButtons"></div>
+      <p class="hint">需要在电视端启用并选中“AirMouse-手机键盘输入”。</p>
+    </section>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
 <script>
 (() => {
+  // HTTP 与 HTTPS 是不同浏览器 origin；切到空中模式时只用 URL fragment 搬运本地偏好。
+  // Fragment 不会随 HTTP 请求发送，进入 HTTPS 后立即写入新 origin 并从地址栏移除。
+  const secureTransfer = new URLSearchParams(location.hash.slice(1)).get('airmouse-transfer');
+  if (location.protocol === 'https:' && secureTransfer) {
+    try {
+      const transferred = JSON.parse(secureTransfer);
+      ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity'].forEach(key => {
+        if (typeof transferred[key] === 'string' && transferred[key].length <= 16384) localStorage.setItem(key, transferred[key]);
+      });
+    } catch (_) { /* 迁移数据损坏时保留 HTTPS 页面现有偏好并继续遥控。 */ }
+    finally {
+      // 即使存储空间不足，也不要让本地场景文本长期留在地址栏或浏览历史中。
+      try { history.replaceState(null, '', location.pathname + location.search); } catch (_) { /* 浏览器禁止改写历史时继续使用页面。 */ }
+    }
+  }
   const token = new URLSearchParams(location.search).get('token');
   const status = document.getElementById('status');
   const statusText = document.getElementById('statusText');
   const toastNode = document.getElementById('toast');
+  const pad = document.getElementById('pad');
   let socket;
+  let clientProof = new URLSearchParams(location.search).get('partyProof') || localStorage.getItem('airmouse-tv-party-proof') || '';
+  if (clientProof) localStorage.setItem('airmouse-tv-party-proof', clientProof);
+  let partyIdentityReady = false;
   let reconnectTimer;
   let toastTimer;
-  let dragMode = false;
   let pointerState = null;
-  let pressedDrag = false;
+  let dragMode = false;
+  let activeMode = 'touch';
+  let pendingSecureUrl = '';
+  let orientationHandler = null;
+  let orientationBaseline = null;
+  let gyroSensitivity = Number(localStorage.getItem('airmouse-tv-gyro-sensitivity') || 7);
+  let feedbackPreferences = { sound:false, vibration:false, cursorStyle:'mint' };
+  try {
+    feedbackPreferences = { ...feedbackPreferences, ...JSON.parse(localStorage.getItem('airmouse-tv-feedback') || '{}') };
+  } catch (_) { /* 偏好损坏时沿用安全的默认静音设置。 */ }
+  feedbackPreferences.sound = feedbackPreferences.sound === true;
+  feedbackPreferences.vibration = feedbackPreferences.vibration === true;
+  if (!['mint','blue','amber'].includes(feedbackPreferences.cursorStyle)) feedbackPreferences.cursorStyle = 'mint';
+  const appRequestId = `apps-${getClientId()}`;
+  const pendingLaunches = new Map();
+  const pendingSceneSearches = new Map();
 
   function showToast(message) {
     toastNode.textContent = message;
     toastNode.classList.add('show');
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => toastNode.classList.remove('show'), 1800);
+    toastTimer = setTimeout(() => toastNode.classList.remove('show'), 2100);
   }
 
   function setConnected(connected, message) {
@@ -138,15 +318,23 @@
   }
 
   function connect() {
-    if (!token) {
-      setConnected(false, '二维码缺少配对令牌');
-      return;
-    }
-    // 控制页由电视 App 提供，所以 WebSocket 与页面同源；令牌只在配对地址中传递。
-    socket = new WebSocket(`ws://${location.host}/ws?token=${encodeURIComponent(token)}`);
-    socket.onopen = () => setConnected(true, '已连接电视');
+    if (!token) { setConnected(false, '二维码缺少配对令牌'); return; }
+    // 页面协议决定 WebSocket 安全级别；HTTP 遥控保持 ws，HTTPS 空中模式使用 wss。
+    const scheme = location.protocol === 'https:' ? 'wss:' : 'ws:';
+    socket = new WebSocket(`${scheme}//${location.host}/ws?token=${encodeURIComponent(token)}`);
+    socket.onopen = () => {
+      setConnected(true, '已连接电视');
+      partyIdentityReady = false;
+      document.getElementById('enableAirButton').disabled = true;
+      send({ type:'join', clientId:getClientId(), proof:clientProof });
+      // 追剧场景只展示电视实际安装并可启动的 App。
+      send({ type:'list_apps', requestId:appRequestId });
+      send({ type:'cursor_style', style:feedbackPreferences.cursorStyle });
+    };
     socket.onclose = () => {
       setConnected(false, '电视连接断开，正在重连…');
+      partyIdentityReady = false;
+      document.getElementById('enableAirButton').disabled = true;
       clearTimeout(reconnectTimer);
       reconnectTimer = setTimeout(connect, 1800);
     };
@@ -156,32 +344,92 @@
         const message = JSON.parse(event.data);
         if (message.type === 'status' && message.connected) setConnected(true, '已连接电视');
         if (message.type === 'notice' && message.message) showToast(message.message);
-      } catch (_) { /* 忽略无法识别的状态消息。 */ }
+        if (message.type === 'secure_ready') showSecureSetup(message);
+        if (message.type === 'apps' && message.requestId === appRequestId) renderApps(message.items || []);
+        if (message.type === 'action_result') handleActionResult(message);
+        if (message.type === 'party_state') renderParty(message);
+        if (message.type === 'party_identity' && message.clientId === getClientId() && typeof message.proof === 'string') {
+          clientProof = message.proof;
+          partyIdentityReady = true;
+          localStorage.setItem('airmouse-tv-party-proof', clientProof);
+          document.getElementById('enableAirButton').disabled = false;
+        }
+        if (message.type === 'party_error') showToast(message.message || '活动暂时无法开始。');
+      } catch (_) { /* 无法识别的状态消息不影响控制。 */ }
     };
   }
 
   function send(message) {
-    if (!socket || socket.readyState !== WebSocket.OPEN) {
-      showToast('电视尚未连接');
-      return false;
-    }
+    if (!socket || socket.readyState !== WebSocket.OPEN) { showToast('电视尚未连接'); return false; }
     socket.send(JSON.stringify(message));
     return true;
   }
 
-  document.querySelectorAll('.tab').forEach(button => button.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(tab => tab.classList.toggle('active', tab === button));
-    document.querySelectorAll('.panel').forEach(panel => panel.classList.toggle('active', panel.id === button.dataset.panel));
-  }));
+  function showPanel(name) {
+    document.querySelectorAll('[data-view]').forEach(view => view.classList.toggle('active', view.dataset.view === name));
+    document.querySelectorAll('.nav-button').forEach(button => button.classList.toggle('active', button.dataset.panel === name));
+    if (name !== 'remote') closeSheet('controlsBackdrop');
+    window.scrollTo({ top:0, behavior:'smooth' });
+  }
+  document.querySelectorAll('.nav-button').forEach(button => button.addEventListener('click', () => showPanel(button.dataset.panel)));
 
-  // 触控板只发送相对位移，真正的电视坐标和屏幕边界由电视端服务维护。
-  const pad = document.getElementById('pad');
+  function toggleFullscreen() {
+    const root = document.documentElement;
+    const request = root.requestFullscreen || root.webkitRequestFullscreen;
+    const exit = document.exitFullscreen || document.webkitExitFullscreen;
+    const isFullscreen = document.fullscreenElement || document.webkitFullscreenElement;
+    if (isFullscreen) {
+      if (exit) Promise.resolve(exit.call(document)).catch(() => showToast('此浏览器无法退出全屏，请使用系统返回手势。'));
+      return;
+    }
+    if (!request) { showToast('当前浏览器不支持全屏，页面仍可正常遥控。'); return; }
+    Promise.resolve(request.call(root)).catch(() => showToast('全屏未开启，请在浏览器设置中允许。'));
+  }
+  document.getElementById('fullscreenButton').addEventListener('click', toggleFullscreen);
+
+  function setMode(mode) {
+    activeMode = mode;
+    if (mode !== 'air') stopAirSensor();
+    document.querySelectorAll('.mode-button').forEach(button => button.classList.toggle('active', button.dataset.mode === mode));
+    const airState = document.getElementById('padAirState');
+    const airMode = mode === 'air';
+    airState.style.display = airMode ? 'flex' : 'none';
+    pad.dataset.hint = airMode ? '准备好后，拿起手机指向电视' : '在这里滑动，电视指针会跟着移动';
+    if (airMode) document.getElementById('enableAirButton').focus({ preventScroll:true });
+  }
+  document.querySelectorAll('.mode-button').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
+  document.getElementById('enableAirButton').addEventListener('click', () => {
+    if (location.protocol === 'https:') {
+      startAirSensor();
+      return;
+    }
+    showToast('正在准备电视安全连接…');
+    if (!partyIdentityReady) { showToast('正在确认这部手机的连接身份，请稍候。'); return; }
+    send({ type:'enable_air_mouse', clientId:getClientId() });
+  });
+  document.getElementById('continueSecureButton').addEventListener('click', () => {
+    if (!pendingSecureUrl) { showToast('请先准备电视安全连接'); return; }
+    // HTTPS 与 HTTP 的 localStorage 相互隔离；用 fragment 单向迁移设置，避免把片名附到请求地址。
+    const keys = ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity'];
+    const transfer = Object.fromEntries(keys.map(key => [key, localStorage.getItem(key)]).filter(([, value]) => value !== null));
+    const secureUrl = new URL(pendingSecureUrl);
+    let fragment = new URLSearchParams({ 'airmouse-transfer':JSON.stringify(transfer) }).toString();
+    if (fragment.length > 16000) {
+      delete transfer['airmouse-tv-scenes'];
+      fragment = new URLSearchParams({ 'airmouse-transfer':JSON.stringify(transfer) }).toString();
+      showToast('已迁移控制偏好；场景较多，请继续使用原 HTTP 页面管理场景。');
+    }
+    secureUrl.hash = fragment;
+    // 由用户点击触发页面跳转，随后在 HTTPS 页面单独申请方向传感器权限。
+    window.location.assign(secureUrl.toString());
+  });
+
   pad.addEventListener('pointerdown', event => {
+    if (activeMode !== 'touch') return;
     event.preventDefault();
     pad.setPointerCapture(event.pointerId);
     pointerState = { id:event.pointerId, x:event.clientX, y:event.clientY, moved:false };
-    pressedDrag = dragMode;
-    if (pressedDrag) send({ type:'drag_start' });
+    if (dragMode) send({ type:'drag_start' });
   });
   pad.addEventListener('pointermove', event => {
     if (!pointerState || event.pointerId !== pointerState.id) return;
@@ -194,64 +442,477 @@
   });
   function finishPointer(event) {
     if (!pointerState || event.pointerId !== pointerState.id) return;
-    if (pressedDrag) send({ type:'drag_end' });
-    else if (!pointerState.moved) send({ type:'click', count:1 });
+    if (dragMode) send({ type:'drag_end' });
+    else if (!pointerState.moved) {
+      send({ type:'click', count:1 });
+      playClickFeedback();
+    }
     pointerState = null;
-    pressedDrag = false;
   }
   pad.addEventListener('pointerup', finishPointer);
   pad.addEventListener('pointercancel', finishPointer);
 
-  document.getElementById('singleClick').addEventListener('click', () => send({ type:'click', count:1 }));
-  document.getElementById('doubleClick').addEventListener('click', () => send({ type:'click', count:2 }));
-  document.getElementById('scrollUp').addEventListener('click', () => send({ type:'scroll', dx:0, dy:-420 }));
-  document.getElementById('scrollDown').addEventListener('click', () => send({ type:'scroll', dx:0, dy:420 }));
+  document.getElementById('clickButton').addEventListener('click', () => send({ type:'click', count:1 }));
+  document.getElementById('doubleButton').addEventListener('click', () => send({ type:'click', count:2 }));
+  document.querySelectorAll('[data-key]').forEach(button => button.addEventListener('click', () => send({ type:'key', name:button.dataset.key })));
+
+  function openSheet(id) {
+    const backdrop = document.getElementById(id);
+    backdrop.classList.add('open');
+    backdrop.setAttribute('aria-hidden', 'false');
+    backdrop.querySelector('button,textarea')?.focus({ preventScroll:true });
+  }
+  function closeSheet(id) {
+    const backdrop = document.getElementById(id);
+    backdrop.classList.remove('open');
+    backdrop.setAttribute('aria-hidden', 'true');
+  }
+  document.getElementById('moreControlsButton').addEventListener('click', () => openSheet('controlsBackdrop'));
+  document.getElementById('closeControlsButton').addEventListener('click', () => closeSheet('controlsBackdrop'));
+  document.getElementById('openKeyboardButton').addEventListener('click', () => {
+    closeSheet('controlsBackdrop');
+    openSheet('keyboardBackdrop');
+  });
+  document.getElementById('closeKeyboardButton').addEventListener('click', () => closeSheet('keyboardBackdrop'));
+  document.querySelectorAll('.sheet-backdrop').forEach(backdrop => backdrop.addEventListener('click', event => {
+    if (event.target === backdrop) closeSheet(backdrop.id);
+  }));
+
+  function getClientId() {
+    let id = new URLSearchParams(location.search).get('clientId') || localStorage.getItem('airmouse-tv-client-id');
+    if (!id) {
+      id = (crypto.randomUUID && crypto.randomUUID()) || `client-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      localStorage.setItem('airmouse-tv-client-id', id);
+    }
+    return id;
+  }
+
+  function renderApps(items) {
+    const select = document.getElementById('sceneApp');
+    const selected = select.value;
+    select.replaceChildren(new Option(items.length ? '选择电视 App' : '电视暂未返回可启动 App', ''));
+    items.forEach(item => {
+      if (typeof item.packageName !== 'string' || typeof item.label !== 'string') return;
+      select.add(new Option(item.label, item.packageName));
+    });
+    if (items.some(item => item.packageName === selected)) select.value = selected;
+  }
+
+  function loadScenes() {
+    try {
+      const stored = JSON.parse(localStorage.getItem('airmouse-tv-scenes') || '[]');
+      return Array.isArray(stored) ? stored.filter(scene => scene && typeof scene.id === 'string' &&
+        typeof scene.name === 'string' && typeof scene.packageName === 'string' && typeof scene.query === 'string') : [];
+    } catch (_) { return []; }
+  }
+
+  function renderScenes() {
+    const list = document.getElementById('sceneList');
+    const scenes = loadScenes();
+    list.replaceChildren();
+    scenes.forEach(scene => {
+      const row = document.createElement('article');
+      row.className = 'scene-item';
+      const label = document.createElement('div');
+      const title = document.createElement('strong');
+      title.textContent = scene.name;
+      const query = document.createElement('div');
+      query.className = 'hint';
+      query.textContent = scene.query;
+      label.append(title, query);
+      const play = document.createElement('button');
+      play.className = 'accent';
+      play.type = 'button';
+      play.textContent = '打开';
+      play.addEventListener('click', () => runScene(scene));
+      const edit = document.createElement('button');
+      edit.type = 'button';
+      edit.textContent = '编辑';
+      edit.addEventListener('click', () => editScene(scene));
+      const remove = document.createElement('button');
+      remove.type = 'button';
+      remove.textContent = '删除';
+      remove.addEventListener('click', () => {
+        localStorage.setItem('airmouse-tv-scenes', JSON.stringify(loadScenes().filter(item => item.id !== scene.id)));
+        renderScenes();
+        showToast('追剧按钮已删除。');
+      });
+      const actions = document.createElement('div');
+      actions.className = 'button-row';
+      actions.append(play, edit, remove);
+      row.append(label, actions);
+      list.appendChild(row);
+    });
+    document.getElementById('sceneEmpty').style.display = scenes.length || document.getElementById('sceneEditor').classList.contains('active') ? 'none' : 'block';
+  }
+
+  let editingSceneId = null;
+  function editScene(scene) {
+    editingSceneId = scene.id;
+    document.getElementById('sceneName').value = scene.name;
+    document.getElementById('sceneApp').value = scene.packageName;
+    document.getElementById('sceneQuery').value = scene.query;
+    document.getElementById('scenePressEnter').checked = scene.pressEnter !== false;
+    document.getElementById('scenePlayAfter').checked = Boolean(scene.playAfter);
+    document.getElementById('sceneEditor').classList.add('active');
+    renderScenes();
+    document.getElementById('sceneName').focus({ preventScroll:true });
+  }
+
+  function handleActionResult(message) {
+    const pendingSearch = pendingSceneSearches.get(message.requestId);
+    if (pendingSearch) {
+      clearTimeout(pendingSearch.timer);
+      pendingSceneSearches.delete(message.requestId);
+      if (!message.success) { showToast(message.message || '搜索框还没准备好，请先在电视上进入搜索。'); return; }
+      showToast('片名已送达电视。');
+      if (pendingSearch.scene.pressEnter !== false) send({ type:'key', name:'enter' });
+      if (pendingSearch.scene.playAfter) window.setTimeout(() => send({ type:'key', name:'play_pause' }), 450);
+      return;
+    }
+    const pending = pendingLaunches.get(message.requestId);
+    if (!pending) return; // 其他手机的场景回执不打扰本机用户。
+    clearTimeout(pending.timer);
+    pendingLaunches.delete(message.requestId);
+    if (!message.success) { showToast(message.message || '电视 App 无法打开。'); return; }
+    showToast('App 已打开，正在确认搜索框…');
+    window.setTimeout(() => {
+      const searchRequestId = `search-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+      const timer = window.setTimeout(() => {
+        if (!pendingSceneSearches.has(searchRequestId)) return;
+        pendingSceneSearches.delete(searchRequestId);
+        showToast('电视暂未确认搜索框；请先在电视上进入搜索再试。');
+      }, 7000);
+      pendingSceneSearches.set(searchRequestId, { scene:pending.scene, timer });
+      if (!send({ type:'scene_text', packageName:pending.scene.packageName, value:pending.scene.query, requestId:searchRequestId })) {
+        clearTimeout(timer);
+        pendingSceneSearches.delete(searchRequestId);
+      }
+    }, 900);
+  }
+
+  function runScene(scene) {
+    const requestId = `launch-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    const timer = window.setTimeout(() => {
+      if (!pendingLaunches.has(requestId)) return;
+      pendingLaunches.delete(requestId);
+      showToast('电视没有确认打开 App，请检查连接后重试。');
+    }, 7000);
+    pendingLaunches.set(requestId, { scene, timer });
+    if (!send({ type:'launch_app', packageName:scene.packageName, requestId })) {
+      clearTimeout(timer);
+      pendingLaunches.delete(requestId);
+    }
+  }
+
+  function showSecureSetup(message) {
+    pendingSecureUrl = message.secureUrl || '';
+    const download = document.getElementById('certificateDownload');
+    download.href = message.certificateUrl || '#';
+    document.getElementById('trustSteps').style.display = 'block';
+    document.getElementById('airHint').textContent = `电视安全地址已准备好。请下载并信任证书，然后继续。请先核对电视屏幕上的 SHA-256 指纹：${message.fingerprint || '电视端当前未显示指纹'}`;
+    document.getElementById('enableAirButton').style.display = 'none';
+    document.getElementById('continueSecureButton').style.display = pendingSecureUrl ? 'block' : 'none';
+    showToast('按手机系统指引信任电视证书后，再继续到安全页面。');
+  }
+
+  function shortestAngle(value) { return ((value + 540) % 360) - 180; }
+
+  async function startAirSensor() {
+    if (location.protocol !== 'https:') { showToast('请先在电视安全页面完成连接设置。'); return; }
+    if (typeof DeviceOrientationEvent === 'undefined') {
+      showToast('此浏览器不支持方向传感器，请切回触控板使用。');
+      return;
+    }
+    try {
+      // iOS Safari 要求由明确的按钮点击触发 requestPermission；其他浏览器无需此步骤。
+      if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+        const permission = await DeviceOrientationEvent.requestPermission();
+        if (permission !== 'granted') throw new Error('permission-denied');
+      }
+      stopAirSensor();
+      orientationBaseline = null;
+      orientationHandler = event => {
+        if (activeMode !== 'air' || document.hidden || event.gamma == null || event.beta == null) return;
+        const current = { gamma:event.gamma, beta:event.beta };
+        if (!orientationBaseline) { orientationBaseline = current; return; }
+        const dx = shortestAngle(current.gamma - orientationBaseline.gamma);
+        const dy = shortestAngle(current.beta - orientationBaseline.beta);
+        orientationBaseline = current;
+        const deadZone = 0.35;
+        send({
+          type:'move',
+          dx:Math.abs(dx) < deadZone ? 0 : Math.max(-80, Math.min(80, dx * gyroSensitivity)),
+          dy:Math.abs(dy) < deadZone ? 0 : Math.max(-80, Math.min(80, dy * gyroSensitivity)),
+          source:'gyro',
+        });
+      };
+      window.addEventListener('deviceorientation', orientationHandler, true);
+      document.getElementById('padAirState').style.display = 'none';
+      pad.dataset.hint = '轻轻转动手机，电视指针会跟着移动';
+      document.getElementById('airPermissionStatus').textContent = '陀螺仪已启用。点击触控板模式即可停止空中控制。';
+      showToast('空中飞鼠已就绪，先缓慢移动手机校准方向。');
+    } catch (_) {
+      document.getElementById('airPermissionStatus').textContent = '未获得方向传感器权限；可切回触控板继续遥控。';
+      showToast('没有开启陀螺仪权限，触控板仍可正常使用。');
+    }
+  }
+
+  function stopAirSensor() {
+    if (orientationHandler) window.removeEventListener('deviceorientation', orientationHandler, true);
+    orientationHandler = null;
+    orientationBaseline = null;
+  }
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden || !orientationHandler) return;
+    stopAirSensor();
+    if (activeMode === 'air') {
+      document.getElementById('padAirState').style.display = 'flex';
+      document.getElementById('airHint').textContent = '页面切到后台后已暂停传感器。点击继续即可重新校准。';
+      document.getElementById('enableAirButton').textContent = '继续空中控制';
+      document.getElementById('enableAirButton').style.display = 'block';
+    }
+  });
+  if (location.protocol === 'https:' && new URLSearchParams(location.search).get('mode') === 'air') {
+    setMode('air');
+    document.getElementById('enableAirButton').textContent = '允许陀螺仪并开始';
+    document.getElementById('airHint').textContent = '安全连接已就绪。点下面按钮后，允许手机方向传感器。';
+  }
+
+  const shortcuts = [ ['back','返回'], ['home','主页'], ['up','上'], ['down','下'], ['left','左'], ['right','右'], ['ok','确认'], ['volume_up','音量 +'], ['volume_down','音量 −'] ];
+  const shortcutSelects = document.getElementById('shortcutSelects');
+  const shortcutButtons = document.getElementById('shortcutButtons');
+  let savedShortcuts;
+  try { savedShortcuts = JSON.parse(localStorage.getItem('airmouse-tv-shortcuts') || '["back","home","up","ok"]'); }
+  catch (_) { savedShortcuts = ['back','home','up','ok']; }
+  for (let index = 0; index < 4; index++) {
+    const select = document.createElement('select');
+    select.setAttribute('aria-label', `自定义快捷键 ${index + 1}`);
+    shortcuts.forEach(([value,label]) => select.add(new Option(label,value)));
+    select.value = shortcuts.some(([value]) => value === savedShortcuts[index]) ? savedShortcuts[index] : shortcuts[index][0];
+    const button = document.createElement('button');
+    button.type = 'button';
+    const syncButton = () => { button.textContent = select.options[select.selectedIndex].text; };
+    syncButton();
+    button.addEventListener('click', () => send({ type:'key', name:select.value }));
+    select.addEventListener('change', () => {
+      syncButton();
+      localStorage.setItem('airmouse-tv-shortcuts', JSON.stringify([...shortcutSelects.children].map(item => item.value)));
+    });
+    shortcutSelects.appendChild(select);
+    shortcutButtons.appendChild(button);
+  }
+
+  function sendText(withEnter) {
+    const input = document.getElementById('textInput');
+    const value = input.value;
+    if (!value.trim()) { showToast('先输入要发送的文字'); input.focus(); return; }
+    if (send({ type:'text', value })) {
+      if (withEnter) send({ type:'key', name:'enter' });
+      input.value = '';
+      closeSheet('keyboardBackdrop');
+    }
+  }
+  document.getElementById('sendTextButton').addEventListener('click', () => sendText(false));
+  document.getElementById('searchTextButton').addEventListener('click', () => sendText(true));
   document.getElementById('dragToggle').addEventListener('click', event => {
     dragMode = !dragMode;
-    event.currentTarget.classList.toggle('on', dragMode);
+    event.currentTarget.setAttribute('aria-pressed', String(dragMode));
     event.currentTarget.textContent = `拖动模式：${dragMode ? '开' : '关'}`;
   });
 
-  document.querySelectorAll('[data-key]').forEach(button => button.addEventListener('click', () => send({ type:'key', name:button.dataset.key })));
+  document.getElementById('newSceneButton').addEventListener('click', () => {
+    editingSceneId = null;
+    document.getElementById('sceneName').value = '';
+    document.getElementById('sceneQuery').value = '';
+    document.getElementById('scenePressEnter').checked = true;
+    document.getElementById('scenePlayAfter').checked = false;
+    document.getElementById('sceneEditor').classList.add('active');
+    renderScenes();
+    document.getElementById('sceneName').focus({ preventScroll:true });
+  });
+  document.getElementById('cancelSceneButton').addEventListener('click', () => {
+    document.getElementById('sceneEditor').classList.remove('active');
+    editingSceneId = null;
+    renderScenes();
+  });
+  document.getElementById('saveSceneButton').addEventListener('click', () => {
+    const name = document.getElementById('sceneName').value.trim();
+    const packageName = document.getElementById('sceneApp').value;
+    const query = document.getElementById('sceneQuery').value.trim();
+    if (!name || !packageName || !query) { showToast('请填写按钮名称、电视 App 和搜索片名。'); return; }
+    const scenes = loadScenes();
+    const scene = {
+      id:editingSceneId || `scene-${Date.now()}`,
+      name, packageName, query,
+      pressEnter:document.getElementById('scenePressEnter').checked,
+      playAfter:document.getElementById('scenePlayAfter').checked,
+    };
+    const existing = scenes.findIndex(item => item.id === scene.id);
+    if (existing >= 0) scenes[existing] = scene; else scenes.push(scene);
+    localStorage.setItem('airmouse-tv-scenes', JSON.stringify(scenes));
+    document.getElementById('sceneEditor').classList.remove('active');
+    editingSceneId = null;
+    renderScenes();
+    showToast('追剧按钮已保存。');
+  });
+  document.querySelectorAll('[data-party]').forEach(button => button.addEventListener('click', () => {
+    const target = button.dataset.party === 'quiz' ? 'quizSetup' : 'voteSetup';
+    // 同一时刻只展开一种同乐流程，避免抢答和投票表单同时堆在窄屏上。
+    document.getElementById('quizSetup').classList.remove('active');
+    document.getElementById('voteSetup').classList.remove('active');
+    document.getElementById(target).classList.add('active');
+    document.getElementById(target).querySelector('input,textarea')?.focus({ preventScroll:true });
+  }));
+  let partyState = null;
+  let countdownTimer = null;
+  function renderParty(state) {
+    partyState = state;
+    const active = Boolean(state.active);
+    document.getElementById('partyChoices').style.display = active ? 'none' : 'grid';
+    document.getElementById('quizSetup').classList.remove('active');
+    document.getElementById('voteSetup').classList.remove('active');
+    document.getElementById('partyActive').classList.toggle('active', active);
+    if (!active) {
+      if (countdownTimer) clearInterval(countdownTimer);
+      countdownTimer = null;
+      return;
+    }
+    showPanel('play');
+    const quiz = state.mode === 'quiz';
+    document.getElementById('partyTitle').textContent = state.question || '同乐活动';
+    const description = document.getElementById('partyDescription');
+    const buzz = document.getElementById('buzzButton');
+    const optionList = document.getElementById('partyOptions');
+    const endButton = document.getElementById('endPartyButton');
+    buzz.style.display = quiz ? 'block' : 'none';
+    optionList.replaceChildren();
+    endButton.style.display = state.hostId === getClientId() ? 'block' : 'none';
 
-  const actions = [
-    ['back','返回'], ['home','主页'], ['up','上'], ['down','下'],
-    ['left','左'], ['right','右'], ['ok','确认'], ['volume_up','音量 +'], ['volume_down','音量 −'],
-  ];
-  const savedSlots = (() => {
-    try { return JSON.parse(localStorage.getItem('airmouse-tv-shortcuts') || '["back","home","up","ok"]'); }
-    catch (_) { return ['back','home','up','ok']; }
-  })();
-  const shortcutSelects = [...document.querySelectorAll('[data-slot]')];
-  const shortcutButtons = document.getElementById('shortcutButtons');
-  shortcutSelects.forEach((select, index) => {
-    actions.forEach(([value, label]) => select.add(new Option(label, value)));
-    select.value = actions.some(([value]) => value === savedSlots[index]) ? savedSlots[index] : actions[index][0];
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.addEventListener('click', () => send({ type:'key', name:select.value }));
-    select.addEventListener('change', () => {
-      button.textContent = select.options[select.selectedIndex].text;
-      localStorage.setItem('airmouse-tv-shortcuts', JSON.stringify(shortcutSelects.map(item => item.value)));
+    if (quiz) {
+      if (countdownTimer) clearInterval(countdownTimer);
+      const updateCountdown = () => {
+        const remaining = Math.max(0, Math.ceil((Number(state.countdownUntil || 0) - Date.now()) / 1000));
+        buzz.disabled = state.winner || remaining > 0;
+        const winnerLabel = state.winnerId === getClientId() ? '你抢到了！' : `${state.winnerLabel || '有玩家'}抢到了！`;
+        buzz.textContent = state.winner ? winnerLabel : remaining ? `${remaining} 秒后开始` : '抢答！';
+        description.textContent = state.winner ? winnerLabel : remaining ? `准备好，${remaining} 秒后开始` : `${state.playerCount || 1} 位玩家已加入，快按下抢答`;
+        if (!remaining && countdownTimer) { clearInterval(countdownTimer); countdownTimer = null; }
+      };
+      updateCountdown();
+      if (!state.winner && Number(state.countdownUntil) > Date.now()) countdownTimer = setInterval(updateCountdown, 200);
+      return;
+    }
+
+    if (countdownTimer) clearInterval(countdownTimer);
+    countdownTimer = null;
+    const options = Array.isArray(state.options) ? state.options : [];
+    const votes = state.votesByClient || {};
+    const hasVoted = Object.prototype.hasOwnProperty.call(votes, getClientId());
+    description.textContent = hasVoted
+      ? `已收到你的选择，${state.playerCount || 1} 位玩家正在一起投票。`
+      : `选一部你想看的，${state.playerCount || 1} 位玩家的票数会实时更新。`;
+    options.forEach(option => {
+      const button = document.createElement('button');
+      button.className = 'option-button';
+      button.type = 'button';
+      button.disabled = hasVoted;
+      const label = document.createElement('span');
+      const count = document.createElement('strong');
+      label.textContent = option.label;
+      count.textContent = `${option.count || 0} 票`;
+      button.append(label, count);
+      button.addEventListener('click', () => send({ type:'vote', clientId:getClientId(), option:Number(option.id) }));
+      optionList.appendChild(button);
     });
-    button.textContent = select.options[select.selectedIndex].text;
-    shortcutButtons.appendChild(button);
+  }
+
+  document.getElementById('startQuizButton').addEventListener('click', () => {
+    const question = document.getElementById('quizQuestion').value.trim();
+    if (!question) { showToast('先写一个抢答问题。'); return; }
+    send({ type:'start_quiz', clientId:getClientId(), question });
+  });
+  document.getElementById('startVoteButton').addEventListener('click', () => {
+    const options = document.getElementById('voteOptions').value.split('\n').map(value => value.trim()).filter(Boolean);
+    if (options.length < 2) { showToast('至少写两个候选片名。'); return; }
+    send({ type:'start_vote', clientId:getClientId(), options });
+  });
+  document.getElementById('buzzButton').addEventListener('click', () => send({ type:'buzz', clientId:getClientId() }));
+  document.getElementById('endPartyButton').addEventListener('click', () => send({ type:'party_end', clientId:getClientId() }));
+  document.querySelectorAll('[data-pref]').forEach(button => button.addEventListener('click', () => {
+    const preference = button.dataset.pref;
+    if (preference === 'vibration' && typeof navigator.vibrate !== 'function') {
+      showToast('当前浏览器不支持手机震动反馈。');
+      return;
+    }
+    if (preference === 'sound' && typeof AudioContext === 'undefined' && typeof webkitAudioContext === 'undefined') {
+      showToast('当前浏览器不支持点击音效。');
+      return;
+    }
+    feedbackPreferences[preference] = !feedbackPreferences[preference];
+    button.setAttribute('aria-pressed', String(feedbackPreferences[preference]));
+    button.textContent = feedbackPreferences[preference] ? '开启' : '关闭';
+    saveFeedbackPreferences();
+  }));
+
+  function saveFeedbackPreferences() {
+    localStorage.setItem('airmouse-tv-feedback', JSON.stringify(feedbackPreferences));
+  }
+  function renderFeedbackPreferences() {
+    document.querySelectorAll('[data-pref]').forEach(button => {
+      const enabled = Boolean(feedbackPreferences[button.dataset.pref]);
+      button.setAttribute('aria-pressed', String(enabled));
+      button.textContent = enabled ? '开启' : '关闭';
+      if (button.dataset.pref === 'vibration' && typeof navigator.vibrate !== 'function') {
+        button.disabled = true;
+        button.textContent = '不支持';
+      }
+    });
+    document.querySelectorAll('.cursor-option').forEach(button => {
+      button.setAttribute('aria-pressed', String(button.dataset.style === feedbackPreferences.cursorStyle));
+    });
+    document.documentElement.dataset.cursorStyle = feedbackPreferences.cursorStyle;
+  }
+  document.querySelectorAll('.cursor-option').forEach(button => button.addEventListener('click', () => {
+    feedbackPreferences.cursorStyle = button.dataset.style;
+    saveFeedbackPreferences();
+    renderFeedbackPreferences();
+    send({ type:'cursor_style', style:feedbackPreferences.cursorStyle });
+    showToast('电视光标样式已更新。');
+  }));
+  const sensitivityControl = document.getElementById('gyroSensitivity');
+  sensitivityControl.value = String(gyroSensitivity);
+  sensitivityControl.addEventListener('input', () => {
+    gyroSensitivity = Number(sensitivityControl.value);
+    localStorage.setItem('airmouse-tv-gyro-sensitivity', String(gyroSensitivity));
+  });
+  let audioContext;
+  function playClickFeedback() {
+    if (feedbackPreferences.vibration && typeof navigator.vibrate === 'function') navigator.vibrate(12);
+    if (!feedbackPreferences.sound) return;
+    try {
+      const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+      if (!AudioContextClass) return;
+      audioContext ||= new AudioContextClass();
+      const oscillator = audioContext.createOscillator();
+      const gain = audioContext.createGain();
+      oscillator.frequency.value = 740;
+      gain.gain.setValueAtTime(0.035, audioContext.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.045);
+      oscillator.connect(gain).connect(audioContext.destination);
+      oscillator.start();
+      oscillator.stop(audioContext.currentTime + 0.05);
+    } catch (_) { /* 音效不可用时保留静默遥控。 */ }
+  }
+  // 声音在第一次真实点击后创建，符合手机浏览器的用户手势限制。
+  document.addEventListener('click', event => {
+    if (event.target.closest('button') && !event.target.closest('button').disabled) playClickFeedback();
   });
 
-  const textInput = document.getElementById('textInput');
-  function sendText(andEnter) {
-    const value = textInput.value;
-    if (!value) { showToast('先输入要发送的文字'); return; }
-    if (send({ type:'text', value })) {
-      if (andEnter) send({ type:'key', name:'enter' });
-      textInput.value = '';
-    }
-  }
-  document.getElementById('sendText').addEventListener('click', () => sendText(false));
-  document.getElementById('searchText').addEventListener('click', () => sendText(true));
-  document.getElementById('clearText').addEventListener('click', () => { textInput.value = ''; textInput.focus(); });
-  connect();
   window.addEventListener('pagehide', () => { clearTimeout(reconnectTimer); socket?.close(); });
+  connect();
+  renderScenes();
+  renderFeedbackPreferences();
 })();
 </script>
 </body>

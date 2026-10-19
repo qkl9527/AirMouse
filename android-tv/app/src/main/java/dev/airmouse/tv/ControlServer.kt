@@ -1,6 +1,7 @@
 package dev.airmouse.tv
 
 import android.content.Context
+import android.content.Intent
 import android.util.Base64
 import org.json.JSONObject
 import java.io.BufferedInputStream
@@ -16,6 +17,7 @@ import java.net.ServerSocket
 import java.net.Socket
 import java.net.URI
 import java.net.URLDecoder
+import java.net.URLEncoder
 import java.nio.charset.StandardCharsets
 import java.security.MessageDigest
 import java.security.SecureRandom
@@ -24,7 +26,12 @@ import java.util.Locale
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLServerSocket
+import javax.net.ssl.SSLSocket
 
 /**
  * 在电视上同时提供手机网页和 WebSocket 控制通道。
@@ -34,6 +41,7 @@ import java.util.concurrent.atomic.AtomicInteger
  */
 object ControlServer {
     private const val DEFAULT_PORT = 8765
+    private const val DEFAULT_HTTPS_PORT = 8766
     private const val MAX_HEADER_BYTES = 8192
     private const val MAX_FRAME_BYTES = 16 * 1024
     private const val MAX_CLIENTS = 4
@@ -42,19 +50,34 @@ object ControlServer {
     interface Listener {
         fun onAction(action: RemoteAction)
         fun onClientCountChanged(count: Int)
+        fun onPartyState(state: JSONObject) = Unit
     }
 
     private val lifecycleLock = Any()
     private val clients = Collections.newSetFromMap(ConcurrentHashMap<Socket, Boolean>())
     private val clientOutputs = ConcurrentHashMap<Socket, DataOutputStream>()
+    // 同乐身份绑定到已配对 WebSocket，不能只相信每条 JSON 消息自报的 clientId。
+    private val partyClientIds = ConcurrentHashMap<Socket, String>()
+    // 首次 join 时签发仅保存在该手机浏览器的随机证明，阻止已配对的其他手机只凭公开 ID 冒充玩家。
+    private val partyCredentials = ConcurrentHashMap<String, String>()
+    private val partyCredentialLock = Any()
+    private val pendingPartyDisconnects = ConcurrentHashMap<String, ScheduledFuture<*>>()
     private val clientCount = AtomicInteger(0)
     private val workers: ExecutorService = Executors.newCachedThreadPool()
+    private val partyDisconnectScheduler = Executors.newSingleThreadScheduledExecutor { runnable ->
+        Thread(runnable, "airmouse-party-disconnect").apply { isDaemon = true }
+    }
 
     @Volatile private var serverSocket: ServerSocket? = null
     @Volatile private var serverThread: Thread? = null
     @Volatile private var listener: Listener? = null
     @Volatile private var pairingToken: String? = null
     @Volatile private var pairingUrl: String? = null
+    @Volatile private var secureServerSocket: SSLServerSocket? = null
+    @Volatile private var secureServerThread: Thread? = null
+    @Volatile private var applicationContext: Context? = null
+    @Volatile private var secureCertificatePem: String? = null
+    @Volatile private var secureFingerprint: String? = null
     @Volatile private var pageBytes: ByteArray = ByteArray(0)
     @Volatile private var serverGeneration = 0L
 
@@ -85,6 +108,7 @@ object ControlServer {
 
         serverSocket = server
         listener = actionListener
+        applicationContext = context.applicationContext
         pairingToken = token
         pairingUrl = url
         pageBytes = runCatching { context.applicationContext.assets.open("remote.html").use { it.readBytes() } }
@@ -116,13 +140,24 @@ object ControlServer {
         pairingToken = null
         pairingUrl = null
         listener = null
+        secureCertificatePem = null
+        secureFingerprint = null
+        runCatching { secureServerSocket?.close() }
+        secureServerSocket = null
+        secureServerThread = null
+        applicationContext = null
         runCatching { serverSocket?.close() }
         serverSocket = null
         clients.toList().forEach { socket -> runCatching { socket.close() } }
         clients.clear()
         clientOutputs.clear()
+        partyClientIds.clear()
+        synchronized(partyCredentialLock) { partyCredentials.clear() }
+        pendingPartyDisconnects.values.forEach { it.cancel(false) }
+        pendingPartyDisconnects.clear()
         clientCount.set(0)
-        TvStatusStore.update { it.copy(pairingUrl = null, clientCount = 0) }
+        PartyRoom.reset()
+        TvStatusStore.update { it.copy(pairingUrl = null, secureFingerprint = null, clientCount = 0) }
     }
 
     private fun acceptLoop(server: ServerSocket, generation: Long) {
@@ -178,8 +213,27 @@ object ControlServer {
                     output.writeHttpResponse(200, "OK", "text/html; charset=utf-8", pageBytes)
                 }
 
+                "/certificate" -> {
+                    val certificate = secureCertificatePem?.toByteArray(StandardCharsets.US_ASCII)
+                    if (certificate == null) {
+                        writeHttpError(output, 404, "Secure Mode Not Prepared")
+                    } else {
+                        output.write(
+                            ("HTTP/1.1 200 OK\r\n" +
+                                "Content-Type: application/x-x509-ca-cert\r\n" +
+                                "Content-Disposition: attachment; filename=airmouse-tv-ca.crt\r\n" +
+                                "Content-Length: ${certificate.size}\r\n" +
+                                "Cache-Control: no-store\r\n" +
+                                "Connection: close\r\n\r\n").toByteArray(StandardCharsets.ISO_8859_1),
+                        )
+                        output.write(certificate)
+                        output.flush()
+                    }
+                }
+
                 "/ws" -> {
-                    if (!isAllowedOrigin(headers["origin"])) {
+                    val secureTransport = socket is SSLSocket
+                    if (!isAllowedOrigin(headers["origin"], secureTransport)) {
                         writeHttpError(output, 403, "Origin Rejected")
                         return
                     }
@@ -188,14 +242,15 @@ object ControlServer {
                         writeHttpError(output, 400, "WebSocket Upgrade Required")
                         return
                     }
-                    if (!registerClient(socket, output, generation)) {
+            if (!reserveClientSlot(generation)) {
                         writeHttpError(output, 503, "Server Restarting or Too Many Controllers")
                         return
                     }
                     countedAsClient = true
                     writeWebSocketUpgrade(output, webSocketAccept)
+            if (!activateClient(socket, output, generation)) return
                     writeTextFrame(output, "{\"type\":\"status\",\"connected\":true}")
-                    readWebSocketMessages(input, output)
+                    readWebSocketMessages(socket, input, output)
                 }
 
                 else -> writeHttpError(output, 404, "Not Found")
@@ -234,6 +289,63 @@ object ControlServer {
         return null
     }
 
+    /** 只有用户主动请求空中模式时才建立 TLS 身份和监听端口。 */
+    private fun prepareSecureMode(socket: Socket, clientId: String): Triple<String, String, String>? = synchronized(lifecycleLock) {
+        // 只为当前已完成 join 身份校验的手机生成安全地址，proof 从服务端记录取回。
+        if (partyClientIds[socket] != clientId) return@synchronized null
+        val partyProof = partyCredentials[clientId] ?: return@synchronized null
+        val expectedPairingUrl = pairingUrl ?: return@synchronized null
+        val host = runCatching { URI(expectedPairingUrl).host }.getOrNull() ?: return@synchronized null
+        val token = pairingToken ?: return@synchronized null
+        val context = applicationContext ?: return@synchronized null
+        var secureServer = secureServerSocket
+        var fingerprint: String
+
+        if (secureServer?.isClosed != false) {
+            val identity = runCatching { LocalTlsIdentity.create(context, host) }.getOrNull()
+                ?: return@synchronized null
+            val tlsContext = SSLContext.getInstance("TLS").apply {
+                init(identity.keyManagers, null, SecureRandom())
+            }
+            val createdServer = tlsContext.serverSocketFactory.createServerSocket() as SSLServerSocket
+            createdServer.reuseAddress = true
+            try {
+                runCatching { createdServer.bind(InetSocketAddress(DEFAULT_HTTPS_PORT)) }
+                    .onFailure { createdServer.bind(InetSocketAddress(0)) }
+            } catch (_: IOException) {
+                runCatching { createdServer.close() }
+                return@synchronized null
+            }
+            createdServer.enabledProtocols = createdServer.supportedProtocols
+                .filter { it == "TLSv1.3" || it == "TLSv1.2" }
+                .toTypedArray()
+            secureCertificatePem = identity.caCertificatePem
+            fingerprint = identity.fingerprint
+            secureFingerprint = identity.fingerprint
+            TvStatusStore.update { it.copy(secureFingerprint = identity.fingerprint) }
+            secureServerSocket = createdServer
+            secureServer = createdServer
+            val activeServer = createdServer
+            val generation = serverGeneration
+            secureServerThread = Thread({ acceptLoop(activeServer, generation) }, "airmouse-tv-https").apply {
+                isDaemon = true
+                start()
+            }
+        } else {
+            // 复用证书根时返回可在配对页展示的稳定指纹。
+            fingerprint = secureFingerprint ?: return@synchronized null
+        }
+
+        val activeServer = secureServer ?: return@synchronized null
+        val encodedClient = URLEncoder.encode(clientId, StandardCharsets.UTF_8.name())
+        val encodedProof = URLEncoder.encode(partyProof, StandardCharsets.UTF_8.name())
+        val encodedToken = URLEncoder.encode(token, StandardCharsets.UTF_8.name())
+        val secureUrl = "https://$host:${activeServer.localPort}/?token=$encodedToken&clientId=$encodedClient&partyProof=$encodedProof&mode=air"
+        val httpPort = serverSocket?.localPort ?: return@synchronized null
+        val certificateUrl = "http://$host:$httpPort/certificate?token=$encodedToken"
+        Triple(secureUrl, certificateUrl, fingerprint)
+    }
+
     private fun webSocketAcceptValue(headers: Map<String, String>): String? {
         if (!headers["upgrade"].equals("websocket", ignoreCase = true)) return null
         val connection = headers["connection"] ?: return null
@@ -256,7 +368,7 @@ object ControlServer {
         output.flush()
     }
 
-    private fun readWebSocketMessages(input: BufferedInputStream, output: DataOutputStream) {
+    private fun readWebSocketMessages(socket: Socket, input: BufferedInputStream, output: DataOutputStream) {
         val frames = DataInputStream(input)
         while (!Thread.currentThread().isInterrupted) {
             val first = frames.readUnsignedByte()
@@ -282,8 +394,45 @@ object ControlServer {
             when (opcode) {
                 0x1 -> {
                     val message = payload.toString(StandardCharsets.UTF_8)
-                    ControlMessage.decode(message)?.let { action ->
-                        runCatching { listener?.onAction(action) }
+                    when (val action = ControlMessage.decode(message)) {
+                        is RemoteAction.ListApps -> writeTextFrame(output, listAppsMessage(action.requestId))
+
+                        is RemoteAction.JoinParty -> {
+                            joinParty(socket, output, action)
+                        }
+
+                        is RemoteAction.StartQuiz -> withPartyIdentity(socket, output, action.clientId) { id ->
+                            PartyRoom.startQuiz(id, action.question)
+                        }
+
+                        is RemoteAction.Buzz -> withPartyIdentity(socket, output, action.clientId) { id -> PartyRoom.buzz(id) }
+
+                        is RemoteAction.StartVote -> withPartyIdentity(socket, output, action.clientId) { id ->
+                            PartyRoom.startVote(id, action.options)
+                        }
+
+                        is RemoteAction.Vote -> withPartyIdentity(socket, output, action.clientId) { id ->
+                            PartyRoom.vote(id, action.optionIndex)
+                        }
+
+                        is RemoteAction.EndParty -> withPartyIdentity(socket, output, action.clientId) { id -> PartyRoom.end(id) }
+
+                        is RemoteAction.EnableAirMouse -> {
+                            val secureDetails = runCatching { prepareSecureMode(socket, action.clientId) }.getOrNull()
+                            if (secureDetails == null) {
+                                writeTextFrame(output, "{\"type\":\"notice\",\"message\":\"无法准备电视安全连接，请确认电视仍连接局域网后重试。\"}")
+                            } else {
+                                writeTextFrame(output, JSONObject().apply {
+                                    put("type", "secure_ready")
+                                    put("secureUrl", secureDetails.first)
+                                    put("certificateUrl", secureDetails.second)
+                                    put("fingerprint", secureDetails.third)
+                                }.toString())
+                            }
+                        }
+
+                        null -> Unit
+                        else -> runCatching { listener?.onAction(action) }
                     }
                 }
 
@@ -304,6 +453,79 @@ object ControlServer {
 
     private fun writeTextFrame(output: DataOutputStream, message: String) {
         writeFrame(output, 0x1, message.toByteArray(StandardCharsets.UTF_8))
+    }
+
+    private fun sendPartyTransition(output: DataOutputStream, transition: PartyRoom.Transition) {
+        val state = transition.state
+        if (state == null) {
+            writeTextFrame(output, JSONObject().put("type", "party_error").put("message", transition.error ?: "活动暂时无法开始。").toString())
+            return
+        }
+        broadcastPartyState(state)
+    }
+
+    private fun broadcastPartyState(state: JSONObject) {
+        clients.forEach { client ->
+            clientOutputs[client]?.let { clientOutput -> runCatching { writeTextFrame(clientOutput, state.toString()) } }
+        }
+        runCatching { listener?.onPartyState(state) }
+    }
+
+    /** 新玩家第一次加入时签发证明；后续连接必须带回证明，不能用公开的 hostId 冒名加入。 */
+    private fun joinParty(socket: Socket, output: DataOutputStream, action: RemoteAction.JoinParty) {
+        val existingSocketId = partyClientIds[socket]
+        if (existingSocketId != null && existingSocketId != action.clientId) {
+            sendPartyError(output, "此连接的参与身份已锁定，请重新连接后加入。")
+            return
+        }
+
+        val proof = synchronized(partyCredentialLock) {
+            val knownProof = partyCredentials[action.clientId]
+            when {
+                knownProof == null -> newToken().also { partyCredentials[action.clientId] = it }
+                constantTimeEquals(knownProof, action.proof) -> knownProof
+                else -> null
+            }
+        }
+        if (proof == null) {
+            sendPartyError(output, "参与身份验证失败，请刷新手机页面后重试。")
+            return
+        }
+        synchronized(lifecycleLock) {
+            partyClientIds.putIfAbsent(socket, action.clientId)
+            pendingPartyDisconnects.remove(action.clientId)?.cancel(false)
+        }
+        val state = PartyRoom.join(action.clientId)
+        writeTextFrame(output, JSONObject()
+            .put("type", "party_identity")
+            .put("clientId", action.clientId)
+            .put("proof", proof)
+            .toString())
+        writeTextFrame(output, state.toString())
+    }
+
+    private fun sendPartyError(output: DataOutputStream, message: String) {
+        writeTextFrame(output, JSONObject().put("type", "party_error").put("message", message).toString())
+    }
+
+    private fun constantTimeEquals(expected: String, candidate: String): Boolean = MessageDigest.isEqual(
+        expected.toByteArray(StandardCharsets.UTF_8),
+        candidate.toByteArray(StandardCharsets.UTF_8),
+    )
+
+    /** 每个房间操作都必须使用该连接初次 join 时绑定的身份，防止伪造主持人或刷多票。 */
+    private fun withPartyIdentity(
+        socket: Socket,
+        output: DataOutputStream,
+        claimedClientId: String,
+        transition: (String) -> PartyRoom.Transition,
+    ) {
+        val boundClientId = partyClientIds[socket]
+        if (boundClientId == null || boundClientId != claimedClientId) {
+            writeTextFrame(output, JSONObject().put("type", "party_error").put("message", "连接身份未确认，请重新连接电视。").toString())
+            return
+        }
+        sendPartyTransition(output, transition(boundClientId))
     }
 
     private fun writeCloseFrame(output: DataOutputStream, code: Int) {
@@ -336,6 +558,38 @@ object ControlServer {
         clientOutputs.values.forEach { output -> runCatching { writeTextFrame(output, safeMessage) } }
     }
 
+    /** 操作结果携带请求号广播；只有发起该请求的手机会认领这条结果。 */
+    fun notifyActionResult(requestId: String, success: Boolean, message: String) {
+        val response = JSONObject()
+            .put("type", "action_result")
+            .put("requestId", requestId)
+            .put("success", success)
+            .put("message", message)
+            .toString()
+        clientOutputs.values.forEach { output -> runCatching { writeTextFrame(output, response) } }
+    }
+
+    private fun listAppsMessage(requestId: String): String {
+        val context = applicationContext ?: return JSONObject()
+            .put("type", "apps").put("requestId", requestId).put("items", org.json.JSONArray()).toString()
+        val launchIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        @Suppress("DEPRECATION")
+        val apps = context.packageManager.queryIntentActivities(launchIntent, 0)
+            .mapNotNull { resolve ->
+                val activity = resolve.activityInfo ?: return@mapNotNull null
+                JSONObject()
+                    .put("packageName", activity.packageName)
+                    .put("label", resolve.loadLabel(context.packageManager).toString())
+            }
+            .distinctBy { it.optString("packageName") }
+            .sortedBy { it.optString("label").lowercase(Locale.ROOT) }
+        return JSONObject()
+            .put("type", "apps")
+            .put("requestId", requestId)
+            .put("items", org.json.JSONArray(apps))
+            .toString()
+    }
+
     private fun parseQuery(rawQuery: String?): Map<String, String> = rawQuery
         ?.split('&')
         ?.mapNotNull { part ->
@@ -357,13 +611,14 @@ object ControlServer {
         )
     }
 
-    private fun isAllowedOrigin(origin: String?): Boolean {
-        // 非浏览器客户端可以没有 Origin，但网页必须与二维码地址同源。
+    private fun isAllowedOrigin(origin: String?, secureTransport: Boolean): Boolean {
+        // 非浏览器客户端可以没有 Origin；网页必须匹配当前传输协议、电视地址和端口。
         if (origin.isNullOrBlank()) return true
-        val expectedUrl = pairingUrl ?: return false
         val actual = runCatching { URI(origin) }.getOrNull() ?: return false
-        val expected = runCatching { URI(expectedUrl) }.getOrNull() ?: return false
-        return actual.scheme == "http" && actual.host == expected.host && actual.port == expected.port
+        val expected = runCatching { URI(pairingUrl ?: return false) }.getOrNull() ?: return false
+        val expectedScheme = if (secureTransport) "https" else "http"
+        val expectedPort = if (secureTransport) secureServerSocket?.localPort else serverSocket?.localPort
+        return actual.scheme == expectedScheme && actual.host == expected.host && actual.port == expectedPort
     }
 
     private fun writeHttpError(output: DataOutputStream, code: Int, reason: String) {
@@ -398,7 +653,8 @@ object ControlServer {
         return Base64.encodeToString(random, Base64.URL_SAFE or Base64.NO_WRAP or Base64.NO_PADDING)
     }
 
-    private fun registerClient(socket: Socket, output: DataOutputStream, generation: Long): Boolean =
+    /** 握手前只占用名额；socket 不加入广播集合，避免 101 响应前收到 WebSocket 帧。 */
+    private fun reserveClientSlot(generation: Long): Boolean =
         synchronized(lifecycleLock) {
             if (generation != serverGeneration || serverSocket?.isClosed != false) return@synchronized false
             val count = clientCount.incrementAndGet()
@@ -406,10 +662,17 @@ object ControlServer {
                 clientCount.decrementAndGet()
                 return@synchronized false
             }
-            clients.add(socket)
-            clientOutputs[socket] = output
             TvStatusStore.update { it.copy(clientCount = count) }
             runCatching { listener?.onClientCountChanged(count) }
+            true
+        }
+
+    /** 只有 HTTP 101 握手写完后才向其他客户端公开新 socket。 */
+    private fun activateClient(socket: Socket, output: DataOutputStream, generation: Long): Boolean =
+        synchronized(lifecycleLock) {
+            if (generation != serverGeneration || serverSocket?.isClosed != false || socket.isClosed) return@synchronized false
+            clients.add(socket)
+            clientOutputs[socket] = output
             true
         }
 
@@ -417,10 +680,27 @@ object ControlServer {
         synchronized(lifecycleLock) {
             clients.remove(socket)
             clientOutputs.remove(socket)
+            val disconnectedPartyId = partyClientIds.remove(socket)
+            if (disconnectedPartyId != null) {
+                // 空中飞鼠会用 HTTPS 替换 HTTP 页面；留一点重连宽限期，避免切换时丢失主持身份。
+                if (disconnectedPartyId !in partyClientIds.values) schedulePartyDisconnect(disconnectedPartyId)
+            }
             if (counted && generation == serverGeneration) {
                 val count = clientCount.updateAndGet { (it - 1).coerceAtLeast(0) }
                 TvStatusStore.update { it.copy(clientCount = count) }
                 runCatching { listener?.onClientCountChanged(count) }
             }
         }
+
+    private fun schedulePartyDisconnect(clientId: String) {
+        pendingPartyDisconnects.remove(clientId)?.cancel(false)
+        pendingPartyDisconnects[clientId] = partyDisconnectScheduler.schedule({
+            synchronized(lifecycleLock) {
+                pendingPartyDisconnects.remove(clientId)
+                if (clientId in partyClientIds.values) return@synchronized
+                val transition = PartyRoom.onDisconnect(clientId, partyClientIds.values.toList())
+                transition.state?.let(::broadcastPartyState)
+            }
+        }, 15, TimeUnit.SECONDS)
+    }
 }

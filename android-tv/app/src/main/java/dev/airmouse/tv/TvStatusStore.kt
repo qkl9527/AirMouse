@@ -10,6 +10,7 @@ import java.util.concurrent.CopyOnWriteArraySet
  */
 data class TvStatus(
     val pairingUrl: String? = null,
+    val secureFingerprint: String? = null,
     val clientCount: Int = 0,
     val accessibilityEnabled: Boolean = false,
     val inputMethodEnabled: Boolean = false,
