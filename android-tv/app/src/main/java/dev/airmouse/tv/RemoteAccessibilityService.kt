@@ -20,6 +20,8 @@ import kotlin.math.max
 /** Android 不允许普通应用注入全局鼠标 HID；本服务用系统授权的触屏手势模拟鼠标操作。 */
 class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listener {
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val pointerIdleTimeoutMs = 2_000L
+    private val hidePointerRunnable = Runnable { if (::overlay.isInitialized) overlay.hidePointer() }
     private lateinit var overlay: PointerOverlay
     private lateinit var windowManager: WindowManager
     private lateinit var audioManager: AudioManager
@@ -39,6 +41,7 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
         pointerX = screenBounds.exactCenterX()
         pointerY = screenBounds.exactCenterY()
         overlay.update(pointerX, pointerY, screenBounds)
+        schedulePointerHide()
         TvStatusStore.update { it.copy(accessibilityEnabled = true, message = null) }
         ControlServer.start(applicationContext, this)
     }
@@ -47,6 +50,7 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
     override fun onInterrupt() = Unit
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
+        mainHandler.removeCallbacks(hidePointerRunnable)
         ControlServer.stop()
         overlay.hide()
         TvStatusStore.update { it.copy(accessibilityEnabled = false, pairingUrl = null) }
@@ -151,9 +155,11 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
         pointerY = (pointerY + dy).coerceIn(screenBounds.top.toFloat(), (screenBounds.bottom - 1).toFloat())
         if (dragPath != null) dragPath?.lineTo(pointerX, pointerY)
         overlay.update(pointerX, pointerY, screenBounds)
+        schedulePointerHide()
     }
 
     private fun click(count: Int) {
+        revealPointer()
         val path = Path().apply {
             moveTo(pointerX, pointerY)
             lineTo(
@@ -168,12 +174,14 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
     }
 
     private fun startDrag() {
+        revealPointer()
         dragPath = Path().apply { moveTo(pointerX, pointerY) }
         dragStartedAt = System.currentTimeMillis()
     }
 
     private fun finishDrag() {
         val path = dragPath ?: return
+        schedulePointerHide()
         dragPath = null
         val duration = (System.currentTimeMillis() - dragStartedAt).coerceIn(120L, 10_000L)
         // Android 手势 API 在手势結束前不暴露逐帧指针流，因此拖动轨迹在抬起时一次提交。
@@ -184,6 +192,7 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
     }
 
     private fun scroll(dx: Float, dy: Float) {
+        revealPointer()
         val startX = pointerX
         val startY = pointerY
         val distanceX = dx.coerceIn(-800f, 800f)
@@ -354,6 +363,18 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
         @Suppress("DEPRECATION")
         windowManager.defaultDisplay.getRealSize(size)
         screenBounds.set(0, 0, max(1, size.x), max(1, size.y))
+    }
+
+    /** 每次指针移动或触摸操作都重新显示箭头，并从最后一次操作开始计时。 */
+    private fun revealPointer() {
+        if (!::overlay.isInitialized) return
+        overlay.showPointer()
+        schedulePointerHide()
+    }
+
+    private fun schedulePointerHide() {
+        mainHandler.removeCallbacks(hidePointerRunnable)
+        mainHandler.postDelayed(hidePointerRunnable, pointerIdleTimeoutMs)
     }
 
     private fun report(message: String) {

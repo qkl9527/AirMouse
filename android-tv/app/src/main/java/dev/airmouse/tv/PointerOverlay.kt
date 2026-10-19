@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Paint
 import android.graphics.PixelFormat
+import android.graphics.Path
 import android.graphics.Rect
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -48,6 +49,16 @@ internal class PointerOverlay(
         show()
     }
 
+    /** 空闲计时器只隐藏指针图形，保留覆盖层以便同乐提示继续显示。 */
+    fun hidePointer() {
+        cursorView.pointerVisible(false)
+    }
+
+    fun showPointer() {
+        cursorView.pointerVisible(true)
+        show()
+    }
+
     /** 同乐期间在电视画面上显示问题和投票进度，inactive 状态会自动隐藏提示。 */
     fun updatePartyState(state: JSONObject) {
         cursorView.partyState(state)
@@ -77,11 +88,21 @@ internal class PointerOverlay(
             color = 0xFF9AA9A4.toInt()
             textSize = 13f * resources.displayMetrics.density
         }
+        private val arrowFillPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.FILL
+            color = 0xFFFFFFFF.toInt()
+        }
+        private val arrowOutlinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            style = Paint.Style.STROKE
+            strokeWidth = 1.8f * resources.displayMetrics.density
+            color = 0xCC101316.toInt()
+        }
         private var pointerX = 0f
         private var pointerY = 0f
         private var radius = 12f * resources.displayMetrics.density
         private var partyState: JSONObject? = null
-        private var cursorStyle = "mint"
+        private var cursorStyle = "arrow"
+        private var isPointerVisible = true
 
         init {
             // 覆盖层铺满屏幕便于和物理屏幕坐标对应，但 canvas 仅在光标附近重绘。
@@ -91,20 +112,28 @@ internal class PointerOverlay(
         }
 
         fun position(x: Float, y: Float, bounds: Rect) {
+            val padding = if (cursorStyle == "arrow") resources.displayMetrics.density * 56f else radius + 8f
             val old = Rect(
-                (pointerX - radius - 8).toInt(), (pointerY - radius - 8).toInt(),
-                (pointerX + radius + 8).toInt(), (pointerY + radius + 8).toInt(),
+                (pointerX - padding).toInt(), (pointerY - padding).toInt(),
+                (pointerX + padding).toInt(), (pointerY + padding).toInt(),
             )
             pointerX = x
             pointerY = y
+            isPointerVisible = true
             radius = max(10f, resources.displayMetrics.density * 12f)
             val dirty = Rect(
-                (x - radius - 8).toInt(), (y - radius - 8).toInt(),
-                (x + radius + 8).toInt(), (y + radius + 8).toInt(),
+                (x - padding).toInt(), (y - padding).toInt(),
+                (x + padding).toInt(), (y + padding).toInt(),
             )
             old.union(dirty)
             old.intersect(bounds)
             invalidate(old)
+        }
+
+        fun pointerVisible(visible: Boolean) {
+            if (isPointerVisible == visible) return
+            isPointerVisible = visible
+            invalidate()
         }
 
         fun partyState(state: JSONObject) {
@@ -113,7 +142,7 @@ internal class PointerOverlay(
         }
 
         fun cursorStyle(style: String) {
-            cursorStyle = style.takeIf { it in setOf("mint", "blue", "amber") } ?: "mint"
+            cursorStyle = style.takeIf { it in setOf("arrow", "mint", "blue", "amber") } ?: "arrow"
             paint.color = when (cursorStyle) {
                 "blue" -> 0xFF70B9FF.toInt()
                 "amber" -> 0xFFFFBF69.toInt()
@@ -125,8 +154,8 @@ internal class PointerOverlay(
 
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
-            // 圆环、中心点和十字线在浅色或视频背景上都容易辨认。
-            when (cursorStyle) {
+            if (isPointerVisible) when (cursorStyle) {
+                "arrow" -> drawMouseArrow(canvas)
                 "blue" -> {
                     // 蓝色皮肤使用旋转方框，让用户不只靠颜色也能区分光标样式。
                     canvas.save()
@@ -158,10 +187,29 @@ internal class PointerOverlay(
                     canvas.drawLine(pointerX, pointerY - radius * 1.6f, pointerX, pointerY + radius * 1.6f, paint)
                 }
             }
-            paint.style = Paint.Style.FILL
-            canvas.drawCircle(pointerX, pointerY, 2.5f * resources.displayMetrics.density, paint)
-            paint.style = Paint.Style.STROKE
+            if (isPointerVisible && cursorStyle != "arrow") {
+                paint.style = Paint.Style.FILL
+                canvas.drawCircle(pointerX, pointerY, 2.5f * resources.displayMetrics.density, paint)
+                paint.style = Paint.Style.STROKE
+            }
             drawPartyBanner(canvas)
+        }
+
+        private fun drawMouseArrow(canvas: Canvas) {
+            // 箭头按约 24×32dp 绘制，与原来的 24dp 指针圆环视觉尺寸接近。
+            val unit = resources.displayMetrics.density
+            val arrow = Path().apply {
+                moveTo(pointerX, pointerY)
+                lineTo(pointerX, pointerY + 29f * unit)
+                lineTo(pointerX + 7.5f * unit, pointerY + 22f * unit)
+                lineTo(pointerX + 14f * unit, pointerY + 32f * unit)
+                lineTo(pointerX + 19f * unit, pointerY + 29f * unit)
+                lineTo(pointerX + 13f * unit, pointerY + 19f * unit)
+                lineTo(pointerX + 24f * unit, pointerY + 18f * unit)
+                close()
+            }
+            canvas.drawPath(arrow, arrowFillPaint)
+            canvas.drawPath(arrow, arrowOutlinePaint)
         }
 
         private fun drawPartyBanner(canvas: Canvas) {

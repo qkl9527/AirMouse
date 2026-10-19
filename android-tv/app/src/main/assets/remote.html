@@ -19,7 +19,7 @@
     button { min-height:46px; padding:0 14px; border:1px solid var(--line); border-radius:14px; background:var(--surface-raised); font-weight:650; touch-action:manipulation; }
     button:active { transform:scale(.975); border-color:var(--mint); }
     button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline:2px solid var(--mint); outline-offset:2px; }
-    .app { width:min(100%,760px); min-height:100dvh; margin:auto; padding:calc(10px + env(safe-area-inset-top)) 16px calc(82px + env(safe-area-inset-bottom)); }
+    .app { width:min(100%,960px); min-height:100dvh; margin:auto; padding:calc(10px + env(safe-area-inset-top)) 16px calc(82px + env(safe-area-inset-bottom)); }
     .topbar { display:flex; min-height:44px; justify-content:space-between; align-items:center; gap:10px; }
     .brand { overflow:hidden; font-size:17px; font-weight:800; letter-spacing:.1px; text-overflow:ellipsis; white-space:nowrap; }
     .top-actions { display:flex; align-items:center; gap:8px; }
@@ -29,18 +29,24 @@
     .icon-button { width:44px; min-width:44px; min-height:44px; padding:0; font-size:20px; }
     .view { display:none; } .view.active { display:block; }
     .remote-view { padding-top:13px; }
-    .mode-switch { display:grid; grid-template-columns:1fr 1fr; gap:4px; padding:4px; margin-bottom:10px; border-radius:15px; background:var(--surface); }
-    .mode-button { min-height:40px; border:0; background:transparent; color:var(--muted); }
+    .mode-switch { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:4px; padding:4px; margin-bottom:10px; border-radius:15px; background:var(--surface); }
+    .mode-button { min-width:0; min-height:44px; padding:0 8px; border:0; background:transparent; color:var(--muted); font-size:13px; }
     .mode-button.active { background:#2a3934; color:var(--mint); }
-    .pad { height:clamp(250px,48dvh,410px); min-height:0; position:relative; overflow:hidden; border:1px solid #34413e; border-radius:25px; background:radial-gradient(ellipse at 50% 42%,#202b29,#171d20 72%); touch-action:none; user-select:none; }
+    .remote-page-track { display:flex; width:100%; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; scrollbar-width:none; touch-action:pan-x; }
+    .remote-page-track::-webkit-scrollbar { display:none; }
+    .remote-page { flex:0 0 100%; min-width:100%; scroll-snap-align:start; }
+    .pad { height:clamp(230px,52dvh,500px); min-height:0; position:relative; overflow:hidden; border:1px solid #34413e; border-radius:25px; background:radial-gradient(ellipse at 50% 42%,#202b29,#171d20 72%); touch-action:none; user-select:none; }
     .pad::after { content:attr(data-hint); position:absolute; right:14px; bottom:16px; left:14px; color:#9aa9a4; font-size:13px; text-align:center; pointer-events:none; }
     .pad-cross { width:38px; height:38px; position:absolute; inset:0; margin:auto; border:1px solid #76e7ac55; border-radius:50%; pointer-events:none; }
     .pad-cross::before, .pad-cross::after { content:""; position:absolute; background:#76e7ac55; }
     .pad-cross::before { width:1px; height:54px; top:-9px; left:18px; }
     .pad-cross::after { width:54px; height:1px; top:18px; left:-9px; }
-    .pad-air { display:none; position:absolute; inset:0; align-items:center; justify-content:center; flex-direction:column; gap:8px; overflow:auto; padding:18px 20px; background:#101316ee; text-align:center; }
-    .pad-air strong { font-size:19px; } .pad-air span { max-width:250px; color:var(--muted); font-size:13px; line-height:1.5; }
-    .trust-steps { display:none; max-width:290px; color:var(--muted); font-size:12px; line-height:1.45; text-align:left; }
+    .air-stage { min-height:clamp(300px,52dvh,500px); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:12px; padding:20px; border:1px solid #34413e; border-radius:25px; background:radial-gradient(ellipse at 50% 35%,#202b29,#171d20 72%); text-align:center; }
+    .air-orbit { width:74px; height:74px; display:grid; place-items:center; border:1px solid #76e7ac55; border-radius:50%; color:var(--mint); font-size:34px; }
+    .air-stage h2 { margin:0; font-size:20px; }
+    .air-stage p { max-width:320px; margin:0; color:var(--muted); font-size:14px; line-height:1.5; }
+    .air-stage button { width:min(100%,320px); }
+    .trust-steps { display:none; max-width:520px; color:var(--muted); font-size:13px; line-height:1.5; text-align:left; }
     .trust-steps p { margin:7px 0; }
     .trust-steps a { display:block; margin:8px 0; color:var(--mint); text-align:center; }
     .trust-steps [hidden] { display:none !important; }
@@ -82,20 +88,21 @@
     .setting-copy small { display:block; margin-top:3px; color:var(--muted); font-size:12px; }
     .toggle { min-width:53px; min-height:34px; padding:0 8px; border-radius:20px; }
     .toggle[aria-pressed="true"] { border-color:var(--mint); background:#20362d; color:var(--mint); }
-    .cursor-options { display:grid; grid-template-columns:repeat(3,1fr); gap:8px; margin-top:11px; }
+    .cursor-options { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; margin-top:11px; }
     .cursor-option { display:grid; justify-items:center; gap:7px; min-height:83px; padding:11px 4px; color:var(--muted); font-size:12px; }
     .cursor-option[aria-pressed="true"] { border-color:var(--mint); color:var(--mint); }
     .cursor-preview { width:23px; height:23px; border:2px solid var(--mint); border-radius:50%; box-shadow:0 0 0 3px #76e7ac22; }
+    .cursor-option[data-style="arrow"] .cursor-preview { width:19px; height:25px; border:0; border-radius:0; background:var(--mint); clip-path:polygon(0 0,0 100%,30% 76%,48% 100%,64% 92%,48% 68%,82% 66%); box-shadow:none; }
     .cursor-option[data-style="blue"] .cursor-preview { border-color:#70b9ff; box-shadow:0 0 0 3px #70b9ff22; }
     .cursor-option[data-style="amber"] .cursor-preview { border-color:#ffbf69; box-shadow:0 0 0 3px #ffbf6922; }
     .nav { position:fixed; z-index:5; right:0; bottom:0; left:0; padding:8px 10px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid #263136; background:#101316f5; backdrop-filter:blur(16px); }
-    .nav-inner { width:min(100%,760px); display:grid; grid-template-columns:repeat(4,1fr); gap:4px; margin:auto; }
+    .nav-inner { width:min(100%,960px); display:grid; grid-template-columns:repeat(4,1fr); gap:4px; margin:auto; }
     .nav-button { display:grid; justify-items:center; align-content:center; gap:3px; min-height:54px; padding:3px; border:0; background:transparent; color:var(--muted); font-size:11px; }
     .nav-button .nav-icon { font-size:19px; line-height:1; }
     .nav-button.active { color:var(--mint); }
     .sheet-backdrop { display:none; position:fixed; z-index:10; inset:0; align-items:flex-end; background:#0009; }
     .sheet-backdrop.open { display:flex; }
-    .sheet { width:min(100%,760px); max-height:85dvh; overflow:auto; margin:auto auto 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); border:1px solid #303b40; border-bottom:0; border-radius:24px 24px 0 0; background:#171d20; }
+    .sheet { width:min(100%,960px); max-height:85dvh; overflow:auto; margin:auto auto 0; padding:18px 16px calc(18px + env(safe-area-inset-bottom)); border:1px solid #303b40; border-bottom:0; border-radius:24px 24px 0 0; background:#171d20; }
     .sheet-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
     .sheet-head h2 { margin:0; font-size:18px; }
     .sheet-head button { min-height:40px; }
@@ -113,14 +120,142 @@
     @media (max-height:680px) {
       .app { padding-top:calc(5px + env(safe-area-inset-top)); }
       .remote-view { padding-top:6px; }
-      .pad { height:43dvh; min-height:210px; }
+      .pad { height:clamp(210px,48dvh,430px); min-height:0; }
       .quick-row { margin-top:7px; }
     }
     @media (min-width:700px) {
       .app { padding-right:24px; padding-left:24px; }
-      .pad { height:min(55dvh,480px); }
+      .pad { height:min(58dvh,520px); }
+    }
+    @media (orientation:landscape) and (max-height:600px) {
+      .app { width:100%; max-width:none; padding:calc(4px + env(safe-area-inset-top)) 18px calc(66px + env(safe-area-inset-bottom)); }
+      .topbar { min-height:38px; }
+      .remote-view { height:calc(100dvh - 118px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); min-height:220px; display:flex; flex-direction:column; padding-top:4px; }
+      .mode-switch { width:min(100%,520px); flex:none; margin:0 auto 6px; }
+      .remote-page-track { flex:1; min-height:0; }
+      .remote-page { height:100%; overflow:auto; }
+      .remote-page-touch { display:grid; grid-template-columns:minmax(0,1fr) 170px; align-items:stretch; gap:10px; }
+      .remote-page-touch .pad { height:100%; min-height:0; }
+      .touch-actions { display:flex; flex-direction:column; justify-content:center; gap:5px; }
+      .touch-actions .quick-row { grid-template-columns:1fr 1fr; gap:6px; margin-top:0; }
+      .touch-actions .more-controls { min-height:42px; margin-top:0; }
+      .air-stage { height:100%; min-height:0; }
+      .keyboard-page { height:100%; overflow:auto; }
+      .keyboard-page .text-box { min-height:90px; }
+    }
+    :fullscreen .app, :-webkit-full-screen .app { width:100vw; max-width:none; min-height:100dvh; }
+    :fullscreen .remote-view, :-webkit-full-screen .remote-view { min-height:calc(100dvh - 175px); }
+    :fullscreen .pad, :fullscreen .air-stage, :-webkit-full-screen .pad, :-webkit-full-screen .air-stage { height:clamp(260px,60dvh,720px); }
+    @media (orientation:portrait) and (max-width:420px) {
+      .app { padding-right:12px; padding-left:12px; }
+      .mode-button { font-size:12px; }
+      .pad { height:clamp(240px,48dvh,430px); }
     }
     @media (prefers-reduced-motion:reduce) { *, *::before, *::after { scroll-behavior:auto !important; transition:none !important; } }
+
+    /* 按 md/design.md 的黑白分区与暖白工作台语言，为遥控器重新建立视觉层级。 */
+    :root {
+      color-scheme:light;
+      --bg:#f9f8f6; --surface:#fff; --surface-raised:#f5f5f3; --line:#e7e7e4;
+      --mint:#111; --text:#0a0a0a; --muted:#74777c; --warning:#c68b36;
+      --black:#0a0a0a; --warm:#f9f8f6; --focus:#336dff;
+    }
+    html, body { background:var(--warm); color:var(--text); }
+    .app { width:min(100%,1320px); min-height:100dvh; padding:0 32px calc(94px + env(safe-area-inset-bottom)); }
+    .topbar { min-height:58px; margin:0 -32px; padding:0 32px; background:var(--black); color:#fff; }
+    .brand { font-size:14px; font-weight:650; letter-spacing:.3px; }
+    .status { color:#b8b8b8; }
+    .status.online { color:#fff; }
+    .status-dot, .status.online .status-dot { background:#fff; box-shadow:none; }
+    .icon-button { border:1px solid #454545; border-radius:999px; background:#242424; color:#fff; }
+    .view { padding-bottom:18px; }
+    .remote-view { padding-top:0; }
+    .remote-intro { padding:30px 0 25px; }
+    .remote-intro h1 { margin:0; font-size:clamp(32px,5vw,52px); font-weight:520; letter-spacing:-1.8px; line-height:1.08; }
+    .remote-intro p { max-width:580px; margin:12px 0 0; color:var(--muted); font-size:15px; line-height:1.6; }
+    .mode-switch { width:max-content; max-width:100%; display:flex; gap:4px; padding:4px; margin:0 0 14px; border:1px solid var(--line); border-radius:999px; background:#fff; }
+    .mode-button { min-width:104px; min-height:42px; padding:0 15px; border:0; border-radius:999px; background:transparent; color:var(--muted); font-size:13px; }
+    .mode-button.active { background:var(--black); color:#fff; }
+    .remote-page-track { overflow-y:visible; }
+    .pad { border:1px solid #303030; border-radius:18px; background:radial-gradient(ellipse at 50% 42%,#303030,#151515 74%); }
+    .pad::after { color:#c6c6c6; }
+    .pad-cross { border-color:#ffffff55; }
+    .pad-cross::before, .pad-cross::after { background:#ffffff55; }
+    .quick-row button, .more-controls { border-radius:999px; }
+    .quick-row .main-action, .accent { border-color:var(--black); background:var(--black); color:#fff; }
+    .quick-row .main-action:active, .accent:active { border-color:#454545; background:#242424; }
+    .air-stage { border:1px solid var(--line); border-radius:18px; background:#fff; }
+    .air-orbit { border-color:var(--line); color:var(--black); }
+    .feature-card, .setting-row, .scene-item { border-color:var(--line); border-radius:14px; background:#fff; }
+    .empty-symbol { border-color:#e7e7e4; background:#f2f1ef; color:var(--black); }
+    .view-heading { font-size:30px; font-weight:520; letter-spacing:-.8px; }
+    .view-subtitle { max-width:620px; font-size:15px; }
+    .field input, .field textarea, .field select, .text-box, .shortcuts select { border-color:var(--line); border-radius:10px; background:#fff; color:var(--text); }
+    button { border-color:var(--line); border-radius:999px; background:#fff; color:var(--text); }
+    button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline-color:var(--focus); }
+    .toggle[aria-pressed="true"], .dpad .ok { border-color:var(--black); background:var(--black); color:#fff; }
+    .cursor-option[aria-pressed="true"] { border-color:var(--black); color:var(--black); }
+    .cursor-preview { border-color:var(--black); box-shadow:0 0 0 3px #0a0a0a12; }
+    .cursor-option[data-style="arrow"] .cursor-preview { background:var(--black); }
+    .nav { border-color:var(--line); background:#ffffffed; }
+    .nav-button { color:var(--muted); }
+    .nav-button.active { color:var(--black); }
+    .sheet { border-color:var(--line); background:#fff; }
+    .toast { border-color:#d8d8d4; background:#242424; color:#fff; }
+    .hint { color:var(--muted); }
+    @media (max-width:699px) {
+      .app { padding-right:16px; padding-left:16px; }
+      .topbar { margin:0 -16px; padding:0 16px; }
+      .remote-intro { padding:23px 0 19px; }
+      .remote-intro h1 { font-size:36px; }
+      .mode-switch { width:100%; }
+      .mode-button { flex:1; min-width:0; padding:0 8px; }
+      .remote-page-track { margin-right:-16px; margin-left:-16px; width:calc(100% + 32px); padding:0 16px; }
+      .remote-page { scroll-snap-align:center; }
+      .pad { height:clamp(250px,50dvh,470px); }
+    }
+    @media (min-width:700px) {
+      .app { padding-right:40px; padding-left:40px; }
+      .topbar { margin-right:-40px; margin-left:-40px; padding-right:40px; padding-left:40px; }
+      .remote-intro { padding-top:42px; }
+      .mode-switch { margin-bottom:18px; }
+    }
+    @media (orientation:landscape) and (max-height:600px) {
+      .app { width:100%; padding:0 20px calc(70px + env(safe-area-inset-bottom)); }
+      .topbar { margin:0 -20px; padding:0 20px; }
+      .remote-intro { display:none; }
+      .remote-view { height:calc(100dvh - 130px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+      .remote-page-track { width:100%; }
+    }
+    :fullscreen .app, :-webkit-full-screen .app { width:100vw; max-width:none; padding-right:clamp(16px,4vw,64px); padding-left:clamp(16px,4vw,64px); }
+    :fullscreen .topbar, :-webkit-full-screen .topbar { margin-right:calc(-1 * clamp(16px,4vw,64px)); margin-left:calc(-1 * clamp(16px,4vw,64px)); padding-right:clamp(16px,4vw,64px); padding-left:clamp(16px,4vw,64px); }
+    @media (max-width:420px) { .app { padding-right:12px; padding-left:12px; } .topbar { margin:0 -12px; padding:0 12px; } }
+    /* 遥控方式只通过点击切换，触控页内的所有按键始终直接可见。 */
+    .remote-page-track { display:block; overflow:visible; touch-action:pan-y; }
+    .remote-page { display:none !important; width:100%; min-width:0; height:auto; flex:none; scroll-snap-align:none; }
+    .remote-page.active { display:block !important; }
+    .remote-page-touch.active { display:block !important; }
+    .touch-actions { display:block; }
+    .dpad { width:min(100%,220px); aspect-ratio:1; margin:12px auto; }
+    .touch-extra-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
+    .touch-extra-actions button { min-width:0; padding:0 8px; font-size:13px; }
+    .drag-toggle-row { display:flex; justify-content:center; margin-top:8px; }
+    .drag-toggle-row button { min-height:40px; color:var(--muted); font-size:13px; }
+    .remote-intro[hidden] { display:none !important; }
+    .intro-countdown { display:block; margin-top:9px; color:var(--muted); font-size:12px; }
+    @media (orientation:landscape) and (max-height:600px) {
+      .remote-page-track { display:block; overflow:auto; }
+      .remote-page.active { height:auto; overflow:visible; }
+      .remote-page-touch.active { display:block !important; }
+      .remote-page-touch .pad { height:clamp(180px,34dvh,300px); }
+      .touch-actions { display:block; }
+      .touch-actions .quick-row { grid-template-columns:repeat(4,minmax(0,1fr)); }
+      .dpad { width:min(100%,190px); margin:8px auto; }
+      .touch-extra-actions { max-width:560px; margin:auto; }
+      .remote-intro { display:block; padding:12px 0; }
+      .remote-intro h1 { font-size:30px; }
+      .remote-intro p { display:none; }
+    }
   </style>
 </head>
 <body>
@@ -134,33 +269,54 @@
     </header>
 
     <section id="view-remote" class="view remote-view active" data-view="remote">
-      <div class="mode-switch" role="group" aria-label="控制方式">
-        <button class="mode-button active" type="button" data-mode="touch">触控板</button>
-        <button class="mode-button" type="button" data-mode="air">空中飞鼠</button>
+      <header id="remoteIntro" class="remote-intro"><h1>把电视，握在手里。</h1><p>轻触、指向或输入文字。选择一种顺手的方式，客厅里的电视就听你安排。</p><small id="introCountdown" class="intro-countdown" aria-live="polite"></small></header>
+      <div class="mode-switch" role="tablist" aria-label="遥控方式">
+        <button class="mode-button active" type="button" role="tab" aria-selected="true" data-mode="touch">触控板</button>
+        <button class="mode-button" type="button" role="tab" aria-selected="false" data-mode="keyboard">键盘输入</button>
+        <button class="mode-button" type="button" role="tab" aria-selected="false" data-mode="air">空中飞鼠</button>
       </div>
-      <div id="pad" class="pad" aria-label="电视触控板" data-hint="在这里滑动，电视指针会跟着移动">
-        <div class="pad-cross"></div>
-        <div id="padAirState" class="pad-air">
-          <strong>空中飞鼠</strong>
-          <span id="airHint">启用后，抬起手机指向电视即可控制指针。</span>
-          <div id="trustSteps" class="trust-steps">
-            <p><b>只需设置一次：</b>信任这台电视的局域网证书后，空中飞鼠就能安全连接。</p>
-            <a id="appleProfileDownload" href="#" hidden>为 iPhone 安装信任描述文件</a>
-            <p id="appleTrustHint" hidden>安装后前往“设置 → 通用 → 关于本机 → 证书信任设置”，开启 AirMouse 证书的完整信任。</p>
-            <a id="certificateDownload" href="#" download="airmouse-tv-ca.cer" hidden>下载电视证书（.cer）</a>
-            <p id="androidTrustHint" hidden>下载后在“设置 → 安全 → 加密与凭据 → 安装证书”中选择 CA 证书，再回到此页。</p>
+      <div id="remotePageTrack" class="remote-page-track" aria-label="遥控方式">
+        <section class="remote-page remote-page-touch active" data-control-page="touch" role="tabpanel" aria-label="触控板遥控">
+          <div id="pad" class="pad" aria-label="电视触控板" data-hint="在这里滑动，电视指针会跟着移动">
+            <div class="pad-cross"></div>
           </div>
-          <button id="enableAirButton" class="accent" type="button" disabled>开始设置</button>
-          <button id="continueSecureButton" type="button" style="display:none">我已信任，继续</button>
-        </div>
+          <div class="touch-actions">
+            <div class="quick-row">
+              <button id="clickButton" class="main-action" type="button">点击</button>
+              <button id="doubleButton" type="button">双击</button>
+              <button data-key="volume_down" type="button" aria-label="音量减小">音量 −</button>
+              <button data-key="volume_up" type="button" aria-label="音量增加">音量 +</button>
+            </div>
+            <div class="dpad" aria-label="方向遥控">
+              <span></span><button data-key="up" aria-label="上" type="button">↑</button><span></span>
+              <button data-key="left" aria-label="左" type="button">←</button><button class="ok" data-key="ok" type="button">确认</button><button data-key="right" aria-label="右" type="button">→</button>
+              <span></span><button data-key="down" aria-label="下" type="button">↓</button><span></span>
+            </div>
+            <div class="touch-extra-actions">
+              <button data-key="back" type="button">返回</button><button data-key="home" type="button">主页</button><button data-key="play_pause" type="button">播放 / 暂停</button>
+            </div>
+            <div class="drag-toggle-row"><button id="dragToggle" type="button" aria-pressed="false">拖动模式：关</button></div>
+          </div>
+        </section>
+        <section class="remote-page" data-control-page="keyboard" role="tabpanel" aria-label="手机键盘输入" hidden>
+          <h2 class="view-heading">手机键盘</h2>
+          <p class="view-subtitle">先在电视 App 打开搜索框，再输入并发送。</p>
+          <textarea id="textInput" class="text-box" autocomplete="off" autocapitalize="off" placeholder="输入电视搜索内容…"></textarea>
+          <div class="button-row"><button id="sendTextButton" type="button">发送文字</button><button id="searchTextButton" class="accent" type="button">发送并搜索</button></div>
+          <div class="shortcuts" id="shortcutSelects"></div>
+          <div class="shortcut-buttons" id="shortcutButtons"></div>
+          <p class="hint">快捷键可在下方自定义；输入法需要在电视端启用并选中“AirMouse-手机键盘输入”。</p>
+        </section>
+        <section class="remote-page" data-control-page="air" role="tabpanel" aria-label="空中飞鼠" hidden>
+          <div class="air-stage">
+            <div class="air-orbit" aria-hidden="true">⌁</div>
+            <h2>空中飞鼠</h2>
+            <p id="airModeStatus">在设置中开启后，拿起手机指向电视即可移动光标。</p>
+            <button id="airClickButton" class="accent" type="button">点击电视</button>
+            <button id="airSettingsButton" type="button">前往设置开启</button>
+          </div>
+        </section>
       </div>
-      <div class="quick-row">
-        <button id="clickButton" class="main-action" type="button">点击</button>
-        <button id="doubleButton" type="button">双击</button>
-        <button data-key="volume_down" type="button" aria-label="音量减小">音量 −</button>
-        <button data-key="volume_up" type="button" aria-label="音量增加">音量 +</button>
-      </div>
-      <button id="moreControlsButton" class="more-controls" type="button">方向键、键盘和更多遥控　⌃</button>
     </section>
 
     <section id="view-scenes" class="view" data-view="scenes">
@@ -212,19 +368,31 @@
 
     <section id="view-settings" class="view" data-view="settings">
       <h1 class="view-heading">遥控偏好</h1>
-      <p class="view-subtitle">让光标和每次点击都更合你手。</p>
+      <p class="view-subtitle">按你的习惯配置遥控和空中飞鼠。</p>
       <div class="settings-list">
-        <div class="setting-row"><span class="setting-copy"><strong>电视光标样式</strong><small>在电视上预览指针颜色</small></span></div>
+        <div class="setting-row"><span class="setting-copy"><strong>空中飞鼠</strong><small>开启后，切到空中飞鼠页即可直接控制</small></span><button id="airMouseToggle" class="toggle" type="button" aria-pressed="false">关闭</button></div>
+        <div class="setting-row"><span class="setting-copy"><strong>首页介绍</strong><small>首次进入首页展示 30 秒；也可以固定开启，或立即关闭</small></span><button id="introToggle" class="toggle" type="button" aria-pressed="false">关闭</button></div>
+        <p id="airPermissionStatus" class="hint">首次开启时会准备安全连接并请求陀螺仪权限。</p>
+        <div id="trustSteps" class="feature-card trust-steps">
+          <p><b>只需设置一次：</b>信任这台电视的局域网证书后，回来开启空中飞鼠。</p>
+          <a id="appleProfileDownload" href="#" hidden>为 iPhone 安装信任描述文件</a>
+          <p id="appleTrustHint" hidden>安装后前往“设置 → 通用 → 关于本机 → 证书信任设置”，开启 AirMouse 证书的完整信任。</p>
+          <a id="certificateDownload" href="#" download="airmouse-tv-ca.cer" hidden>下载电视证书（.cer）</a>
+          <p id="androidTrustHint" hidden>下载后在“设置 → 安全 → 加密与凭据 → 安装证书”中选择 CA 证书，再回到此页。</p>
+          <button id="continueSecureButton" type="button" style="display:none">证书已信任，继续</button>
+        </div>
+        <button id="enableAirButton" class="accent" type="button" disabled>准备空中飞鼠</button>
+        <div class="setting-row"><span class="setting-copy"><strong>电视光标样式</strong><small>默认使用鼠标箭头，也可切换其他样式</small></span></div>
         <div class="cursor-options">
-          <button class="cursor-option" data-style="mint" type="button" aria-pressed="true"><span class="cursor-preview"></span>薄荷绿</button>
-          <button class="cursor-option" data-style="blue" type="button" aria-pressed="false"><span class="cursor-preview"></span>晴空蓝</button>
-          <button class="cursor-option" data-style="amber" type="button" aria-pressed="false"><span class="cursor-preview"></span>暖阳橙</button>
+          <button class="cursor-option" data-style="arrow" type="button" aria-pressed="true"><span class="cursor-preview"></span>鼠标箭头</button>
+          <button class="cursor-option" data-style="mint" type="button" aria-pressed="false"><span class="cursor-preview"></span>薄荷圆环</button>
+          <button class="cursor-option" data-style="blue" type="button" aria-pressed="false"><span class="cursor-preview"></span>晴空方框</button>
+          <button class="cursor-option" data-style="amber" type="button" aria-pressed="false"><span class="cursor-preview"></span>暖阳角标</button>
         </div>
         <div class="setting-row"><span class="setting-copy"><strong>点击音效</strong><small>手机发出轻提示音</small></span><button class="toggle" data-pref="sound" type="button" aria-pressed="false">关闭</button></div>
         <div class="setting-row"><span class="setting-copy"><strong>轻震反馈</strong><small>点击时让手机轻轻震一下</small></span><button class="toggle" data-pref="vibration" type="button" aria-pressed="false">关闭</button></div>
         <label class="setting-row"><span class="setting-copy"><strong>空中飞鼠灵敏度</strong><small>移动角度更小，光标也能快速跟上</small></span><input id="gyroSensitivity" type="range" min="2" max="14" step="0.5" value="7"></label>
       </div>
-      <p id="airPermissionStatus" class="hint">空中飞鼠仅在你主动切换后申请陀螺仪权限。</p>
     </section>
   </main>
 
@@ -235,30 +403,6 @@
     <button class="nav-button" type="button" data-panel="settings"><span class="nav-icon">⚙</span><span>设置</span></button>
   </div></nav>
 
-  <div id="controlsBackdrop" class="sheet-backdrop" aria-hidden="true">
-    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="controlsTitle">
-      <div class="sheet-head"><h2 id="controlsTitle">常用遥控</h2><button id="closeControlsButton" type="button" aria-label="关闭">完成</button></div>
-      <div class="dpad" aria-label="方向遥控">
-        <span></span><button data-key="up" aria-label="上" type="button">↑</button><span></span>
-        <button data-key="left" aria-label="左" type="button">←</button><button class="ok" data-key="ok" type="button">确认</button><button data-key="right" aria-label="右" type="button">→</button>
-        <span></span><button data-key="down" aria-label="下" type="button">↓</button><span></span>
-      </div>
-      <div class="button-row"><button data-key="back" type="button">返回</button><button data-key="home" type="button">主页</button><button data-key="play_pause" type="button">播放 / 暂停</button></div>
-      <div class="button-row"><button id="openKeyboardButton" type="button">手机键盘输入</button><button id="dragToggle" type="button" aria-pressed="false">拖动模式：关</button></div>
-      <p class="hint">电视搜索时，先在电视 App 打开输入框，再用手机键盘输入。</p>
-    </section>
-  </div>
-
-  <div id="keyboardBackdrop" class="sheet-backdrop" aria-hidden="true">
-    <section class="sheet" role="dialog" aria-modal="true" aria-labelledby="keyboardTitle">
-      <div class="sheet-head"><h2 id="keyboardTitle">手机键盘输入</h2><button id="closeKeyboardButton" type="button" aria-label="关闭">完成</button></div>
-      <textarea id="textInput" class="text-box" autocomplete="off" autocapitalize="off" placeholder="输入电视搜索内容…"></textarea>
-      <div class="button-row"><button id="sendTextButton" type="button">发送文字</button><button id="searchTextButton" class="accent" type="button">发送并搜索</button></div>
-      <div class="shortcuts" id="shortcutSelects"></div>
-      <div class="shortcut-buttons" id="shortcutButtons"></div>
-      <p class="hint">需要在电视端启用并选中“AirMouse-手机键盘输入”。</p>
-    </section>
-  </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
 <script>
@@ -269,7 +413,7 @@
   if (location.protocol === 'https:' && secureTransfer) {
     try {
       const transferred = JSON.parse(secureTransfer);
-      ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity'].forEach(key => {
+      ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity','airmouse-tv-intro-seen','airmouse-tv-show-intro'].forEach(key => {
         if (typeof transferred[key] === 'string' && transferred[key].length <= 16384) localStorage.setItem(key, transferred[key]);
       });
     } catch (_) { /* 迁移数据损坏时保留 HTTPS 页面现有偏好并继续遥控。 */ }
@@ -277,6 +421,15 @@
       // 即使存储空间不足，也不要让本地场景文本长期留在地址栏或浏览历史中。
       try { history.replaceState(null, '', location.pathname + location.search); } catch (_) { /* 浏览器禁止改写历史时继续使用页面。 */ }
     }
+  }
+  // 首次打开时展示一次；之后默认收起，用户可以在设置里重新显示并长期保留选择。
+  const introSeenKey = 'airmouse-tv-intro-seen';
+  const showIntroKey = 'airmouse-tv-show-intro';
+  const firstVisit = localStorage.getItem(introSeenKey) !== 'true';
+  let showHomeIntro = firstVisit || localStorage.getItem(showIntroKey) === 'true';
+  if (firstVisit) {
+    localStorage.setItem(introSeenKey, 'true');
+    localStorage.setItem(showIntroKey, 'false');
   }
   const token = new URLSearchParams(location.search).get('token');
   const status = document.getElementById('status');
@@ -292,17 +445,21 @@
   let pointerState = null;
   let dragMode = false;
   let activeMode = 'touch';
+  let introCountdownSeconds = 30;
+  let introCountdownTimer = null;
+  let introCountdownStarted = false;
+  let airMouseEnabled = localStorage.getItem('airmouse-tv-air-enabled') === 'true';
   let pendingSecureUrl = '';
   let orientationHandler = null;
   let orientationBaseline = null;
   let gyroSensitivity = Number(localStorage.getItem('airmouse-tv-gyro-sensitivity') || 7);
-  let feedbackPreferences = { sound:false, vibration:false, cursorStyle:'mint' };
+  let feedbackPreferences = { sound:false, vibration:false, cursorStyle:'arrow' };
   try {
     feedbackPreferences = { ...feedbackPreferences, ...JSON.parse(localStorage.getItem('airmouse-tv-feedback') || '{}') };
   } catch (_) { /* 偏好损坏时沿用安全的默认静音设置。 */ }
   feedbackPreferences.sound = feedbackPreferences.sound === true;
   feedbackPreferences.vibration = feedbackPreferences.vibration === true;
-  if (!['mint','blue','amber'].includes(feedbackPreferences.cursorStyle)) feedbackPreferences.cursorStyle = 'mint';
+  if (!['arrow','mint','blue','amber'].includes(feedbackPreferences.cursorStyle)) feedbackPreferences.cursorStyle = 'arrow';
   const appRequestId = `apps-${getClientId()}`;
   const pendingLaunches = new Map();
   const pendingSceneSearches = new Map();
@@ -370,10 +527,49 @@
   function showPanel(name) {
     document.querySelectorAll('[data-view]').forEach(view => view.classList.toggle('active', view.dataset.view === name));
     document.querySelectorAll('.nav-button').forEach(button => button.classList.toggle('active', button.dataset.panel === name));
-    if (name !== 'remote') closeSheet('controlsBackdrop');
+    if (name !== 'remote') {
+      stopAirSensor();
+    } else if (activeMode === 'air' && airMouseEnabled) {
+      startAirSensor();
+    }
+    if (name === 'remote') startIntroCountdown();
     window.scrollTo({ top:0, behavior:'smooth' });
   }
   document.querySelectorAll('.nav-button').forEach(button => button.addEventListener('click', () => showPanel(button.dataset.panel)));
+
+  function renderIntroPreference() {
+    const toggle = document.getElementById('introToggle');
+    toggle.setAttribute('aria-pressed', String(showHomeIntro));
+    toggle.textContent = showHomeIntro ? '开启' : '关闭';
+    document.getElementById('remoteIntro').hidden = !showHomeIntro;
+    document.getElementById('introCountdown').textContent = introCountdownTimer
+      ? `${introCountdownSeconds} 秒后自动收起`
+      : (showHomeIntro && localStorage.getItem(showIntroKey) === 'true' ? '已在设置中保持显示' : '');
+  }
+  function startIntroCountdown() {
+    if (!firstVisit || !showHomeIntro || introCountdownStarted) return;
+    introCountdownStarted = true;
+    introCountdownSeconds = 30;
+    introCountdownTimer = setInterval(() => {
+      introCountdownSeconds -= 1;
+      if (introCountdownSeconds <= 0) {
+        clearInterval(introCountdownTimer);
+        introCountdownTimer = null;
+        showHomeIntro = false;
+        localStorage.setItem(showIntroKey, 'false');
+      }
+      renderIntroPreference();
+    }, 1000);
+    renderIntroPreference();
+  }
+  document.getElementById('introToggle').addEventListener('click', () => {
+    if (introCountdownTimer) clearInterval(introCountdownTimer);
+    introCountdownTimer = null;
+    introCountdownStarted = true;
+    showHomeIntro = !showHomeIntro;
+    localStorage.setItem(showIntroKey, String(showHomeIntro));
+    renderIntroPreference();
+  });
 
   function toggleFullscreen() {
     const root = document.documentElement;
@@ -391,28 +587,48 @@
 
   function setMode(mode) {
     activeMode = mode;
+    document.querySelectorAll('.mode-button').forEach(button => {
+      const selected = button.dataset.mode === mode;
+      button.classList.toggle('active', selected);
+      button.setAttribute('aria-selected', String(selected));
+    });
+    const pages = [...document.querySelectorAll('[data-control-page]')];
+    pages.forEach(page => {
+      const selected = page.dataset.controlPage === mode;
+      page.classList.toggle('active', selected);
+      page.hidden = !selected;
+      page.setAttribute('aria-hidden', String(!selected));
+    });
     if (mode !== 'air') stopAirSensor();
-    document.querySelectorAll('.mode-button').forEach(button => button.classList.toggle('active', button.dataset.mode === mode));
-    const airState = document.getElementById('padAirState');
-    const airMode = mode === 'air';
-    airState.style.display = airMode ? 'flex' : 'none';
-    pad.dataset.hint = airMode ? '准备好后，拿起手机指向电视' : '在这里滑动，电视指针会跟着移动';
-    if (airMode) document.getElementById('enableAirButton').focus({ preventScroll:true });
+    else if (airMouseEnabled) startAirSensor();
+    renderAirMode();
   }
   document.querySelectorAll('.mode-button').forEach(button => button.addEventListener('click', () => setMode(button.dataset.mode)));
+  document.getElementById('airSettingsButton').addEventListener('click', () => showPanel('settings'));
+  document.getElementById('airClickButton').addEventListener('click', () => {
+    send({ type:'click', count:1 });
+    playClickFeedback();
+  });
   document.getElementById('enableAirButton').addEventListener('click', () => {
-    if (location.protocol === 'https:') {
-      startAirSensor();
-      return;
-    }
     showToast('正在准备电视安全连接…');
     if (!partyIdentityReady) { showToast('正在确认这部手机的连接身份，请稍候。'); return; }
     send({ type:'enable_air_mouse', clientId:getClientId() });
   });
+  document.getElementById('airMouseToggle').addEventListener('click', () => {
+    if (!airMouseEnabled) enableAirMouse();
+    else {
+      airMouseEnabled = false;
+      localStorage.setItem('airmouse-tv-air-enabled', 'false');
+      stopAirSensor();
+      renderAirSetting();
+      renderAirMode();
+      showToast('空中飞鼠已关闭。');
+    }
+  });
   document.getElementById('continueSecureButton').addEventListener('click', () => {
     if (!pendingSecureUrl) { showToast('请先准备电视安全连接'); return; }
     // HTTPS 与 HTTP 的 localStorage 相互隔离；用 fragment 单向迁移设置，避免把片名附到请求地址。
-    const keys = ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity'];
+    const keys = ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity','airmouse-tv-intro-seen','airmouse-tv-show-intro'];
     const transfer = Object.fromEntries(keys.map(key => [key, localStorage.getItem(key)]).filter(([, value]) => value !== null));
     const secureUrl = new URL(pendingSecureUrl);
     let fragment = new URLSearchParams({ 'airmouse-transfer':JSON.stringify(transfer) }).toString();
@@ -422,7 +638,9 @@
       showToast('已迁移控制偏好；场景较多，请继续使用原 HTTP 页面管理场景。');
     }
     secureUrl.hash = fragment;
-    // 由用户点击触发页面跳转，随后在 HTTPS 页面单独申请方向传感器权限。
+    secureUrl.searchParams.delete('mode');
+    secureUrl.searchParams.set('panel', 'settings');
+    // 首次信任完成后落在配置页；陀螺仪权限由用户在该页开启空中飞鼠时申请。
     window.location.assign(secureUrl.toString());
   });
 
@@ -457,28 +675,6 @@
   document.getElementById('clickButton').addEventListener('click', () => send({ type:'click', count:1 }));
   document.getElementById('doubleButton').addEventListener('click', () => send({ type:'click', count:2 }));
   document.querySelectorAll('[data-key]').forEach(button => button.addEventListener('click', () => send({ type:'key', name:button.dataset.key })));
-
-  function openSheet(id) {
-    const backdrop = document.getElementById(id);
-    backdrop.classList.add('open');
-    backdrop.setAttribute('aria-hidden', 'false');
-    backdrop.querySelector('button,textarea')?.focus({ preventScroll:true });
-  }
-  function closeSheet(id) {
-    const backdrop = document.getElementById(id);
-    backdrop.classList.remove('open');
-    backdrop.setAttribute('aria-hidden', 'true');
-  }
-  document.getElementById('moreControlsButton').addEventListener('click', () => openSheet('controlsBackdrop'));
-  document.getElementById('closeControlsButton').addEventListener('click', () => closeSheet('controlsBackdrop'));
-  document.getElementById('openKeyboardButton').addEventListener('click', () => {
-    closeSheet('controlsBackdrop');
-    openSheet('keyboardBackdrop');
-  });
-  document.getElementById('closeKeyboardButton').addEventListener('click', () => closeSheet('keyboardBackdrop'));
-  document.querySelectorAll('.sheet-backdrop').forEach(backdrop => backdrop.addEventListener('click', event => {
-    if (event.target === backdrop) closeSheet(backdrop.id);
-  }));
 
   function getClientId() {
     let id = new URLSearchParams(location.search).get('clientId') || localStorage.getItem('airmouse-tv-client-id');
@@ -633,74 +829,107 @@
       document.getElementById('appleTrustHint').hidden = false;
     }
     document.getElementById('trustSteps').style.display = 'block';
-    document.getElementById('airHint').textContent = `电视安全地址已准备好。请下载并信任证书，然后继续。请先核对电视屏幕上的 SHA-256 指纹：${message.fingerprint || '电视端当前未显示指纹'}`;
+    document.getElementById('airPermissionStatus').textContent = `电视安全地址已准备好。核对指纹 ${message.fingerprint || '电视端当前未显示'}，安装并信任证书后继续。`;
     document.getElementById('enableAirButton').style.display = 'none';
     document.getElementById('continueSecureButton').style.display = pendingSecureUrl ? 'block' : 'none';
+    showPanel('settings');
     showToast('按手机系统指引信任电视证书后，再继续到安全页面。');
   }
 
   function shortestAngle(value) { return ((value + 540) % 360) - 180; }
 
-  async function startAirSensor() {
-    if (location.protocol !== 'https:') { showToast('请先在电视安全页面完成连接设置。'); return; }
+  async function enableAirMouse() {
+    if (location.protocol !== 'https:') {
+      if (!partyIdentityReady) { showToast('正在确认这部手机的连接身份，请稍候。'); return; }
+      showToast('先完成一次电视安全连接设置。');
+      send({ type:'enable_air_mouse', clientId:getClientId() });
+      return;
+    }
     if (typeof DeviceOrientationEvent === 'undefined') {
-      showToast('此浏览器不支持方向传感器，请切回触控板使用。');
+      showToast('此浏览器不支持方向传感器，空中飞鼠无法开启。');
       return;
     }
     try {
-      // iOS Safari 要求由明确的按钮点击触发 requestPermission；其他浏览器无需此步骤。
+      // 把 iOS 必须由用户手势触发的权限申请放在设置开关上，切换遥控页时不再弹权限提示。
       if (typeof DeviceOrientationEvent.requestPermission === 'function') {
         const permission = await DeviceOrientationEvent.requestPermission();
         if (permission !== 'granted') throw new Error('permission-denied');
       }
-      stopAirSensor();
-      orientationBaseline = null;
-      orientationHandler = event => {
-        if (activeMode !== 'air' || document.hidden || event.gamma == null || event.beta == null) return;
-        const current = { gamma:event.gamma, beta:event.beta };
-        if (!orientationBaseline) { orientationBaseline = current; return; }
-        const dx = shortestAngle(current.gamma - orientationBaseline.gamma);
-        const dy = shortestAngle(current.beta - orientationBaseline.beta);
-        orientationBaseline = current;
-        const deadZone = 0.35;
-        send({
-          type:'move',
-          dx:Math.abs(dx) < deadZone ? 0 : Math.max(-80, Math.min(80, dx * gyroSensitivity)),
-          dy:Math.abs(dy) < deadZone ? 0 : Math.max(-80, Math.min(80, dy * gyroSensitivity)),
-          source:'gyro',
-        });
-      };
-      window.addEventListener('deviceorientation', orientationHandler, true);
-      document.getElementById('padAirState').style.display = 'none';
-      pad.dataset.hint = '轻轻转动手机，电视指针会跟着移动';
-      document.getElementById('airPermissionStatus').textContent = '陀螺仪已启用。点击触控板模式即可停止空中控制。';
-      showToast('空中飞鼠已就绪，先缓慢移动手机校准方向。');
+      airMouseEnabled = true;
+      localStorage.setItem('airmouse-tv-air-enabled', 'true');
+      renderAirSetting();
+      renderAirMode();
+      if (activeMode === 'air') startAirSensor();
+      showToast('空中飞鼠已开启；以后切到空中飞鼠页就能直接使用。');
     } catch (_) {
-      document.getElementById('airPermissionStatus').textContent = '未获得方向传感器权限；可切回触控板继续遥控。';
-      showToast('没有开启陀螺仪权限，触控板仍可正常使用。');
+      document.getElementById('airPermissionStatus').textContent = '没有获得陀螺仪权限；请在浏览器设置允许方向传感器后重试。';
+      showToast('未获得陀螺仪权限，空中飞鼠保持关闭。');
+      renderAirSetting();
     }
+  }
+
+  function startAirSensor() {
+    if (!airMouseEnabled || activeMode !== 'air' || orientationHandler || document.hidden) return;
+    if (location.protocol !== 'https:' || typeof DeviceOrientationEvent === 'undefined') {
+      renderAirMode();
+      return;
+    }
+    orientationBaseline = null;
+    orientationHandler = event => {
+      if (activeMode !== 'air' || document.hidden || event.gamma == null || event.beta == null) return;
+      const current = { gamma:event.gamma, beta:event.beta };
+      if (!orientationBaseline) { orientationBaseline = current; return; }
+      const dx = shortestAngle(current.gamma - orientationBaseline.gamma);
+      const dy = shortestAngle(current.beta - orientationBaseline.beta);
+      orientationBaseline = current;
+      const deadZone = 0.35;
+      send({
+        type:'move',
+        dx:Math.abs(dx) < deadZone ? 0 : Math.max(-80, Math.min(80, dx * gyroSensitivity)),
+        dy:Math.abs(dy) < deadZone ? 0 : Math.max(-80, Math.min(80, dy * gyroSensitivity)),
+        source:'gyro',
+      });
+    };
+    window.addEventListener('deviceorientation', orientationHandler, true);
+    renderAirMode();
   }
 
   function stopAirSensor() {
     if (orientationHandler) window.removeEventListener('deviceorientation', orientationHandler, true);
     orientationHandler = null;
     orientationBaseline = null;
+    renderAirMode();
   }
-  document.addEventListener('visibilitychange', () => {
-    if (!document.hidden || !orientationHandler) return;
-    stopAirSensor();
-    if (activeMode === 'air') {
-      document.getElementById('padAirState').style.display = 'flex';
-      document.getElementById('airHint').textContent = '页面切到后台后已暂停传感器。点击继续即可重新校准。';
-      document.getElementById('enableAirButton').textContent = '继续空中控制';
-      document.getElementById('enableAirButton').style.display = 'block';
+
+  function renderAirSetting() {
+    const toggle = document.getElementById('airMouseToggle');
+    toggle.setAttribute('aria-pressed', String(airMouseEnabled));
+    toggle.textContent = airMouseEnabled ? '开启' : '关闭';
+    document.getElementById('enableAirButton').hidden = location.protocol === 'https:';
+    if (location.protocol !== 'https:') {
+      document.getElementById('airPermissionStatus').textContent = '开启前需要先建立一次电视安全连接。';
+    } else if (airMouseEnabled) {
+      document.getElementById('airPermissionStatus').textContent = '空中飞鼠已开启；切到空中飞鼠页即可直接控制。';
+    } else if (!document.getElementById('trustSteps').style.display.includes('block')) {
+      document.getElementById('airPermissionStatus').textContent = '首次开启时会申请陀螺仪权限；之后切到空中飞鼠页即可直接使用。';
     }
-  });
-  if (location.protocol === 'https:' && new URLSearchParams(location.search).get('mode') === 'air') {
-    setMode('air');
-    document.getElementById('enableAirButton').textContent = '允许陀螺仪并开始';
-    document.getElementById('airHint').textContent = '安全连接已就绪。点下面按钮后，允许手机方向传感器。';
   }
+
+  function renderAirMode() {
+    const enabled = airMouseEnabled && location.protocol === 'https:';
+    const status = document.getElementById('airModeStatus');
+    const settingsButton = document.getElementById('airSettingsButton');
+    document.getElementById('airClickButton').hidden = !enabled;
+    settingsButton.textContent = enabled ? '管理空中飞鼠设置' : '前往设置开启';
+    if (!enabled) status.textContent = '在设置中开启一次后，切到这里就能拿起手机指向电视。';
+    else if (orientationHandler) status.textContent = '空中飞鼠已就绪。轻轻转动手机，电视指针会跟着移动。';
+    else status.textContent = '空中飞鼠已开启；进入此页时会自动启动陀螺仪。';
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) stopAirSensor();
+    else if (activeMode === 'air' && airMouseEnabled) startAirSensor();
+  });
 
   const shortcuts = [ ['back','返回'], ['home','主页'], ['up','上'], ['down','下'], ['left','左'], ['right','右'], ['ok','确认'], ['volume_up','音量 +'], ['volume_down','音量 −'] ];
   const shortcutSelects = document.getElementById('shortcutSelects');
@@ -733,7 +962,7 @@
     if (send({ type:'text', value })) {
       if (withEnter) send({ type:'key', name:'enter' });
       input.value = '';
-      closeSheet('keyboardBackdrop');
+      input.blur();
     }
   }
   document.getElementById('sendTextButton').addEventListener('click', () => sendText(false));
@@ -936,6 +1165,11 @@
   connect();
   renderScenes();
   renderFeedbackPreferences();
+  renderAirSetting();
+  renderIntroPreference();
+  renderAirMode();
+  const initialPanel = new URLSearchParams(location.search).get('panel');
+  showPanel(['remote','scenes','play','settings'].includes(initialPanel) ? initialPanel : 'remote');
 })();
 </script>
 </body>

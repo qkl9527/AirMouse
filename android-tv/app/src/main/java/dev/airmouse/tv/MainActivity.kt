@@ -1,6 +1,7 @@
 package dev.airmouse.tv
 
 import android.app.Activity
+import android.content.res.Configuration
 import android.content.ComponentName
 import android.content.Intent
 import android.provider.Settings
@@ -9,6 +10,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.InputMethodManager
 import android.widget.Button
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
@@ -27,6 +29,9 @@ class MainActivity : Activity() {
     private lateinit var tlsFingerprintState: TextView
     private lateinit var qrImage: ImageView
     private var renderedQrUrl: String? = null
+    // 横竖屏切换会创建新的 ImageView；缓存位图可直接挂回新视图，避免 URL 缓存误判成已显示。
+    private var renderedQrBitmap: android.graphics.Bitmap? = null
+    private var qrBitmapBoundTo: ImageView? = null
 
     private val statusListener: (TvStatus) -> Unit = { status ->
         runOnUiThread { render(status) }
@@ -48,11 +53,24 @@ class MainActivity : Activity() {
         super.onPause()
     }
 
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        // Manifest 保留 Activity 以维持电视服务状态；尺寸变化时重建首页以切换横竖屏布局。
+        buildHomeScreen()
+        render(TvStatusStore.snapshot())
+    }
+
     private fun buildHomeScreen() {
+        val widthDp = resources.configuration.screenWidthDp.takeIf { it > 0 }
+            ?: (resources.displayMetrics.widthPixels / resources.displayMetrics.density).toInt()
+        val heightDp = resources.configuration.screenHeightDp.takeIf { it > 0 }
+            ?: (resources.displayMetrics.heightPixels / resources.displayMetrics.density).toInt()
+        val wideLayout = widthDp >= 720 || (widthDp >= 540 && widthDp > heightDp)
+        val compactHeight = heightDp < 480
         val root = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER
-            setPadding(dp(56), dp(36), dp(56), dp(36))
+            orientation = if (wideLayout) LinearLayout.HORIZONTAL else LinearLayout.VERTICAL
+            gravity = if (wideLayout) Gravity.CENTER else Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            setPadding(dp(if (wideLayout) 40 else 22), dp(if (compactHeight) 16 else 26), dp(if (wideLayout) 40 else 22), dp(24))
             setBackgroundColor(0xFF101316.toInt())
         }
 
@@ -89,8 +107,12 @@ class MainActivity : Activity() {
         instructions.addView(addressState, matchWrap())
         instructions.addView(tlsFingerprintState, matchWrap())
 
-        root.addView(instructions, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1.4f))
-        root.addView(spacer(32, true))
+        if (wideLayout) {
+            root.addView(instructions, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.MATCH_PARENT, 1.4f))
+        } else {
+            root.addView(instructions, matchWrap())
+        }
+        root.addView(spacer(if (wideLayout) 28 else 18, wideLayout))
 
         val qrPanel = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -98,17 +120,45 @@ class MainActivity : Activity() {
             setPadding(dp(22), dp(22), dp(22), dp(22))
             setBackgroundColor(0xFFFFFFFF.toInt())
         }
+        val qrSizeDp = when {
+            widthDp >= 900 -> 280
+            widthDp >= 600 -> 230
+            // 窄屏要同时给根容器留白、二维码卡片内边距和边缘缓冲，避免竖屏手机上横向溢出。
+            else -> (widthDp - 96).coerceIn(128, 220)
+        }
         qrImage = ImageView(this).apply {
             contentDescription = "AirMouse 手机配对二维码"
             scaleType = ImageView.ScaleType.FIT_CENTER
             setBackgroundColor(0xFFFFFFFF.toInt())
+            setImageBitmap(renderedQrBitmap)
         }
-        qrPanel.addView(qrImage, LinearLayout.LayoutParams(dp(300), dp(300)))
+        qrPanel.addView(qrImage, LinearLayout.LayoutParams(dp(qrSizeDp), dp(qrSizeDp)))
         qrPanel.addView(spacer(12))
         qrPanel.addView(text("手机扫码连接", 17f, 0xFF101316.toInt(), true), wrapWrap())
-        root.addView(qrPanel, LinearLayout.LayoutParams(dp(350), dp(350)))
+        root.addView(
+            qrPanel,
+            if (wideLayout) LinearLayout.LayoutParams(dp(qrSizeDp + 44), dp(qrSizeDp + 86))
+            else LinearLayout.LayoutParams(ViewGroup.LayoutParams.WRAP_CONTENT, ViewGroup.LayoutParams.WRAP_CONTENT).apply {
+                gravity = Gravity.CENTER_HORIZONTAL
+            },
+        )
 
-        setContentView(ScrollView(this).apply { addView(root) })
+        setContentView(ScrollView(this).apply {
+            isFillViewport = wideLayout
+            addView(
+                root,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    if (wideLayout) ViewGroup.LayoutParams.MATCH_PARENT else ViewGroup.LayoutParams.WRAP_CONTENT,
+                ),
+            )
+        })
+
+        // 首次进入时服务可能正在启动；等新视图完成挂载后再用最新状态补画一次二维码。
+        val createdQrImage = qrImage
+        createdQrImage.post {
+            if (qrImage === createdQrImage && !isFinishing) render(TvStatusStore.snapshot())
+        }
     }
 
     private fun refreshSetupStatus() {
@@ -161,14 +211,32 @@ class MainActivity : Activity() {
         tlsFingerprintState.visibility = if (status.secureFingerprint.isNullOrBlank()) View.GONE else View.VISIBLE
 
         if (status.pairingUrl.isNullOrBlank()) {
+            qrImage.setImageDrawable(null)
             qrImage.visibility = View.INVISIBLE
             renderedQrUrl = null
+            renderedQrBitmap = null
+            qrBitmapBoundTo = null
         } else {
-            qrImage.visibility = View.VISIBLE
-            if (status.pairingUrl != renderedQrUrl) {
-                createQrBitmap(status.pairingUrl)?.let(qrImage::setImageBitmap)
+            if (status.pairingUrl != renderedQrUrl || renderedQrBitmap == null) {
+                val bitmap = createQrBitmap(status.pairingUrl)
+                if (bitmap == null) {
+                    // 生成失败时不要把 URL 记成已渲染；下次状态刷新时仍可重试。
+                    qrImage.setImageDrawable(null)
+                    qrImage.visibility = View.INVISIBLE
+                    renderedQrUrl = null
+                    renderedQrBitmap = null
+                    qrBitmapBoundTo = null
+                    return
+                }
+                renderedQrBitmap = bitmap
                 renderedQrUrl = status.pairingUrl
             }
+            // 每个新建的 ImageView 都单独记录绑定状态；不依赖 drawable 是否为 null 来判断是否画过。
+            if (qrBitmapBoundTo !== qrImage || qrImage.drawable == null) {
+                qrImage.setImageBitmap(renderedQrBitmap)
+                qrBitmapBoundTo = qrImage
+            }
+            qrImage.visibility = View.VISIBLE
         }
     }
 

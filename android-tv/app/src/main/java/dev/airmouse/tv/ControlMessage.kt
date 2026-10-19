@@ -133,7 +133,7 @@ object ControlMessage {
                 "party_end" -> validClientId(json.optString("clientId"))?.let(RemoteAction::EndParty)
 
                 "cursor_style" -> json.optString("style")
-                    .takeIf { it in setOf("mint", "blue", "amber") }
+                    .takeIf { it in setOf("arrow", "mint", "blue", "amber") }
                     ?.let(RemoteAction::CursorStyle)
 
                 else -> null
