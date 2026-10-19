@@ -82,8 +82,11 @@
     .answer-button { width:100%; min-height:115px; margin-top:14px; border-color:var(--mint); background:#20362d; color:var(--mint); font-size:24px; }
     .option-list { display:grid; gap:9px; margin-top:14px; }
     .option-button { display:flex; align-items:center; justify-content:space-between; text-align:left; }
-    .settings-list { display:grid; gap:10px; }
-    .setting-row { display:flex; align-items:center; justify-content:space-between; gap:12px; padding:15px 14px; border:1px solid #263136; border-radius:16px; background:var(--surface); }
+    .settings-list { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; width:100%; min-width:0; }
+    .settings-list > * { min-width:0; max-width:100%; }
+    .setting-row { display:flex; align-items:center; justify-content:space-between; gap:12px; min-width:0; padding:15px 14px; border:1px solid #263136; border-radius:16px; background:var(--surface); }
+    .setting-copy { min-width:0; }
+    #airPermissionStatus, .trust-steps { overflow-wrap:anywhere; }
     .setting-copy strong { display:block; font-size:14px; }
     .setting-copy small { display:block; margin-top:3px; color:var(--muted); font-size:12px; }
     .toggle { min-width:53px; min-height:34px; padding:0 8px; border-radius:20px; }
@@ -95,6 +98,13 @@
     .cursor-option[data-style="arrow"] .cursor-preview { width:19px; height:25px; border:0; border-radius:0; background:var(--mint); clip-path:polygon(0 0,0 100%,30% 76%,48% 100%,64% 92%,48% 68%,82% 66%); box-shadow:none; }
     .cursor-option[data-style="blue"] .cursor-preview { border-color:#70b9ff; box-shadow:0 0 0 3px #70b9ff22; }
     .cursor-option[data-style="amber"] .cursor-preview { border-color:#ffbf69; box-shadow:0 0 0 3px #ffbf6922; }
+    .range-setting { display:grid; grid-template-columns:1fr; gap:8px; }
+    .range-setting input { width:100%; margin:0; accent-color:var(--mint); }
+    .range-setting output { float:right; color:var(--muted); font-variant-numeric:tabular-nums; }
+    .cursor-options { grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+    .cursor-option { min-width:0; min-height:68px; gap:5px; padding:8px 2px; font-size:clamp(10px,3vw,12px); }
+    .cursor-preview { width:20px; height:20px; }
+    .cursor-option[data-style="arrow"] .cursor-preview { width:15px; height:21px; }
     .nav { position:fixed; z-index:5; right:0; bottom:0; left:0; padding:8px 10px calc(8px + env(safe-area-inset-bottom)); border-top:1px solid #263136; background:#101316f5; backdrop-filter:blur(16px); }
     .nav-inner { width:min(100%,960px); display:grid; grid-template-columns:repeat(4,1fr); gap:4px; margin:auto; }
     .nav-button { display:grid; justify-items:center; align-content:center; gap:3px; min-height:54px; padding:3px; border:0; background:transparent; color:var(--muted); font-size:11px; }
@@ -237,10 +247,8 @@
     .remote-page-touch.active { display:block !important; }
     .touch-actions { display:block; }
     .dpad { width:min(100%,220px); aspect-ratio:1; margin:12px auto; }
-    .touch-extra-actions { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; }
-    .touch-extra-actions button { min-width:0; padding:0 8px; font-size:13px; }
-    .drag-toggle-row { display:flex; justify-content:center; margin-top:8px; }
-    .drag-toggle-row button { min-height:40px; color:var(--muted); font-size:13px; }
+    .touch-extra-actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; }
+    .touch-extra-actions button { min-width:0; padding:0 4px; font-size:clamp(10px,3.2vw,13px); white-space:nowrap; }
     .remote-intro[hidden] { display:none !important; }
     .intro-countdown { display:block; margin-top:9px; color:var(--muted); font-size:12px; }
     @media (orientation:landscape) and (max-height:600px) {
@@ -256,6 +264,36 @@
       .remote-intro h1 { font-size:30px; }
       .remote-intro p { display:none; }
     }
+    /* 默认触控板按宽高比 4:3（高度为宽度 75%）；用户输入的像素高度会覆盖默认比例。 */
+    /* 固定宽度后，高度自适应 4:3；用户自定义时只改变纵向高度，不让宽高比反推宽度。 */
+    .pad { width:100% !important; height:var(--pad-custom-height,auto) !important; aspect-ratio:4 / 3; min-height:0; }
+    .pad-expand-button { position:absolute; z-index:2; top:10px; right:10px; width:44px; min-width:44px; height:44px; min-height:44px; display:grid; place-items:center; padding:0; border:1px solid #ffffff30; border-radius:50%; background:#101719c9; color:#fff; }
+    .pad-expand-button svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.8; }
+    .pad-expand-button .collapse-icon { display:none; }
+    .pad.expanded { position:fixed; z-index:40; inset:0; width:100vw !important; max-width:none; height:100dvh !important; min-height:100dvh; aspect-ratio:auto; margin:0; border:0; border-radius:0; }
+    .pad.expanded .pad-expand-button { top:calc(10px + env(safe-area-inset-top)); right:calc(10px + env(safe-area-inset-right)); }
+    .pad.expanded .pad-expand-button .expand-icon { display:none; }
+    .pad.expanded .pad-expand-button .collapse-icon { display:block; }
+    .pad.expanded::after { bottom:calc(18px + env(safe-area-inset-bottom)); }
+    html.pad-expanded, body.pad-expanded { overflow:hidden !important; }
+    @media (orientation:landscape) and (max-height:600px) {
+      /* 横屏宽度远大于高度，默认触控区改用短一些的纵向高度，避免把方向键挤到屏幕外。 */
+      .remote-view { height:auto; min-height:0; display:block; }
+      .remote-page-track { display:block; width:100%; height:auto; min-height:0; overflow:visible; flex:none; }
+      .remote-page, .remote-page.active { height:auto; overflow:visible; }
+      .pad { height:var(--pad-custom-height,clamp(120px,34dvh,180px)) !important; aspect-ratio:auto; }
+      /* 两组四键使用相同列宽、间距和按钮高度，横屏时视觉上保持齐整。 */
+      .touch-actions .quick-row, .touch-extra-actions { grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; width:100%; max-width:none; margin:6px 0 0; }
+      .touch-actions .quick-row button, .touch-extra-actions button { min-height:42px; padding:0 4px; font-size:clamp(10px,3.2vw,13px); white-space:nowrap; }
+      .dpad { width:min(100%,130px); margin:8px auto; }
+    }
+    .pad-height-setting { display:grid; grid-template-columns:1fr; gap:10px; }
+    .pad-height-copy strong { display:block; font-size:14px; }
+    .pad-height-copy small { display:block; margin-top:3px; color:var(--muted); font-size:12px; }
+    .pad-height-control { display:flex; align-items:center; gap:7px; }
+    .pad-height-control button { min-width:42px; min-height:42px; padding:0; }
+    .pad-height-control input { width:90px; min-width:0; min-height:42px; padding:6px; border:1px solid var(--line); border-radius:10px; background:#fff; color:var(--text); text-align:center; }
+    .pad-height-control .reset-height { width:auto; margin-left:auto; padding:0 12px; font-size:12px; }
   </style>
 </head>
 <body>
@@ -279,6 +317,10 @@
         <section class="remote-page remote-page-touch active" data-control-page="touch" role="tabpanel" aria-label="触控板遥控">
           <div id="pad" class="pad" aria-label="电视触控板" data-hint="在这里滑动，电视指针会跟着移动">
             <div class="pad-cross"></div>
+            <button id="padExpandButton" class="pad-expand-button" type="button" aria-label="展开触控板" aria-expanded="false" title="展开触控板">
+              <svg class="expand-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/></svg>
+              <svg class="collapse-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v5H3M16 3h5v5M21 16h-5v5M8 21v-5H3"/></svg>
+            </button>
           </div>
           <div class="touch-actions">
             <div class="quick-row">
@@ -287,15 +329,14 @@
               <button data-key="volume_down" type="button" aria-label="音量减小">音量 −</button>
               <button data-key="volume_up" type="button" aria-label="音量增加">音量 +</button>
             </div>
+            <div class="touch-extra-actions">
+              <button data-key="back" type="button">返回</button><button data-key="home" type="button">主页</button><button data-key="play_pause" type="button">播放 / 暂停</button><button id="dragToggle" type="button" aria-pressed="false">拖动：关</button>
+            </div>
             <div class="dpad" aria-label="方向遥控">
               <span></span><button data-key="up" aria-label="上" type="button">↑</button><span></span>
               <button data-key="left" aria-label="左" type="button">←</button><button class="ok" data-key="ok" type="button">确认</button><button data-key="right" aria-label="右" type="button">→</button>
               <span></span><button data-key="down" aria-label="下" type="button">↓</button><span></span>
             </div>
-            <div class="touch-extra-actions">
-              <button data-key="back" type="button">返回</button><button data-key="home" type="button">主页</button><button data-key="play_pause" type="button">播放 / 暂停</button>
-            </div>
-            <div class="drag-toggle-row"><button id="dragToggle" type="button" aria-pressed="false">拖动模式：关</button></div>
           </div>
         </section>
         <section class="remote-page" data-control-page="keyboard" role="tabpanel" aria-label="手机键盘输入" hidden>
@@ -371,7 +412,6 @@
       <p class="view-subtitle">按你的习惯配置遥控和空中飞鼠。</p>
       <div class="settings-list">
         <div class="setting-row"><span class="setting-copy"><strong>空中飞鼠</strong><small>开启后，切到空中飞鼠页即可直接控制</small></span><button id="airMouseToggle" class="toggle" type="button" aria-pressed="false">关闭</button></div>
-        <div class="setting-row"><span class="setting-copy"><strong>首页介绍</strong><small>首次进入首页展示 30 秒；也可以固定开启，或立即关闭</small></span><button id="introToggle" class="toggle" type="button" aria-pressed="false">关闭</button></div>
         <p id="airPermissionStatus" class="hint">首次开启时会准备安全连接并请求陀螺仪权限。</p>
         <div id="trustSteps" class="feature-card trust-steps">
           <p><b>只需设置一次：</b>信任这台电视的局域网证书后，回来开启空中飞鼠。</p>
@@ -382,6 +422,19 @@
           <button id="continueSecureButton" type="button" style="display:none">证书已信任，继续</button>
         </div>
         <button id="enableAirButton" class="accent" type="button" disabled>准备空中飞鼠</button>
+        <label class="setting-row range-setting"><span class="setting-copy"><strong>空中飞鼠灵敏度</strong><small>移动角度更小，光标也能快速跟上</small></span><input id="gyroSensitivity" type="range" min="2" max="14" step="0.5" value="7"></label>
+        <label class="setting-row range-setting"><span class="setting-copy"><strong>触控板灵敏度 <output id="touchSensitivityValue">5.0×</output></strong><small>调整滑动时电视指针移动的速度</small></span><input id="touchSensitivity" type="range" min="0.5" max="10" step="0.1" value="5"></label>
+        <div class="setting-row"><span class="setting-copy"><strong>首页介绍</strong><small>首次进入首页展示 30 秒；也可以固定开启，或立即关闭</small></span><button id="introToggle" class="toggle" type="button" aria-pressed="false">关闭</button></div>
+        <div class="setting-row pad-height-setting">
+          <span class="pad-height-copy"><strong>触控板高度</strong><small id="padHeightSummary">默认高度为宽度的 75%，可输入像素值调整。</small></span>
+          <div class="pad-height-control" aria-label="调整触控板高度">
+            <button id="padHeightDown" type="button" aria-label="触控板高度减少 10 像素">−</button>
+            <input id="padHeightInput" type="number" min="80" max="1600" step="10" inputmode="numeric" aria-label="触控板高度，像素">
+            <button id="padHeightUp" type="button" aria-label="触控板高度增加 10 像素">+</button>
+            <span>px</span>
+            <button id="resetPadHeight" class="reset-height" type="button">恢复默认</button>
+          </div>
+        </div>
         <div class="setting-row"><span class="setting-copy"><strong>电视光标样式</strong><small>默认使用鼠标箭头，也可切换其他样式</small></span></div>
         <div class="cursor-options">
           <button class="cursor-option" data-style="arrow" type="button" aria-pressed="true"><span class="cursor-preview"></span>鼠标箭头</button>
@@ -391,7 +444,6 @@
         </div>
         <div class="setting-row"><span class="setting-copy"><strong>点击音效</strong><small>手机发出轻提示音</small></span><button class="toggle" data-pref="sound" type="button" aria-pressed="false">关闭</button></div>
         <div class="setting-row"><span class="setting-copy"><strong>轻震反馈</strong><small>点击时让手机轻轻震一下</small></span><button class="toggle" data-pref="vibration" type="button" aria-pressed="false">关闭</button></div>
-        <label class="setting-row"><span class="setting-copy"><strong>空中飞鼠灵敏度</strong><small>移动角度更小，光标也能快速跟上</small></span><input id="gyroSensitivity" type="range" min="2" max="14" step="0.5" value="7"></label>
       </div>
     </section>
   </main>
@@ -413,7 +465,7 @@
   if (location.protocol === 'https:' && secureTransfer) {
     try {
       const transferred = JSON.parse(secureTransfer);
-      ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity','airmouse-tv-intro-seen','airmouse-tv-show-intro'].forEach(key => {
+      ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity','airmouse-tv-touch-sensitivity','airmouse-tv-intro-seen','airmouse-tv-show-intro'].forEach(key => {
         if (typeof transferred[key] === 'string' && transferred[key].length <= 16384) localStorage.setItem(key, transferred[key]);
       });
     } catch (_) { /* 迁移数据损坏时保留 HTTPS 页面现有偏好并继续遥控。 */ }
@@ -436,6 +488,14 @@
   const statusText = document.getElementById('statusText');
   const toastNode = document.getElementById('toast');
   const pad = document.getElementById('pad');
+  const padExpandButton = document.getElementById('padExpandButton');
+  const padHeightStorageKey = 'airmouse-tv-pad-height-px';
+  const savedPadHeight = Number(localStorage.getItem(padHeightStorageKey));
+  let customPadHeight = Number.isFinite(savedPadHeight) && savedPadHeight >= 80 && savedPadHeight <= 1600
+    ? Math.round(savedPadHeight)
+    : null;
+  let lastMeasuredPadHeight = 0;
+  if (customPadHeight !== null) pad.style.setProperty('--pad-custom-height', `${customPadHeight}px`);
   let socket;
   let clientProof = new URLSearchParams(location.search).get('partyProof') || localStorage.getItem('airmouse-tv-party-proof') || '';
   if (clientProof) localStorage.setItem('airmouse-tv-party-proof', clientProof);
@@ -453,6 +513,11 @@
   let orientationHandler = null;
   let orientationBaseline = null;
   let gyroSensitivity = Number(localStorage.getItem('airmouse-tv-gyro-sensitivity') || 7);
+  const touchSensitivityStorageKey = 'airmouse-tv-touch-sensitivity';
+  const savedTouchSensitivity = Number(localStorage.getItem(touchSensitivityStorageKey));
+  let touchSensitivity = Number.isFinite(savedTouchSensitivity) && savedTouchSensitivity >= 0.5 && savedTouchSensitivity <= 10
+    ? savedTouchSensitivity
+    : 5;
   let feedbackPreferences = { sound:false, vibration:false, cursorStyle:'arrow' };
   try {
     feedbackPreferences = { ...feedbackPreferences, ...JSON.parse(localStorage.getItem('airmouse-tv-feedback') || '{}') };
@@ -533,9 +598,79 @@
       startAirSensor();
     }
     if (name === 'remote') startIntroCountdown();
+    if (name === 'settings') requestAnimationFrame(renderPadHeightSetting);
     window.scrollTo({ top:0, behavior:'smooth' });
   }
   document.querySelectorAll('.nav-button').forEach(button => button.addEventListener('click', () => showPanel(button.dataset.panel)));
+
+  const padHeightInput = document.getElementById('padHeightInput');
+  const padHeightSummary = document.getElementById('padHeightSummary');
+  function getActualPadHeight() {
+    // 触控板离开首页后会被 display:none；使用最近一次实际布局尺寸，避免设置里出现估算值。
+    const renderedHeight = pad.getBoundingClientRect().height;
+    if (renderedHeight > 0) {
+      lastMeasuredPadHeight = renderedHeight;
+      return Math.round(renderedHeight);
+    }
+    if (customPadHeight !== null) return customPadHeight;
+    if (lastMeasuredPadHeight > 0) return Math.round(lastMeasuredPadHeight);
+    // 页面首次直接打开设置时，触控板尚未可见；按其最大容器宽度推算默认 4:3 尺寸。
+    const app = document.querySelector('.app');
+    const appStyle = getComputedStyle(app);
+    const maxWidth = Number.parseFloat(appStyle.maxWidth) || window.innerWidth;
+    const appWidth = Math.min(window.innerWidth, maxWidth);
+    const contentWidth = Math.max(0, appWidth - Number.parseFloat(appStyle.paddingLeft) - Number.parseFloat(appStyle.paddingRight));
+    return Math.round(contentWidth * 0.75);
+  }
+  function renderPadHeightSetting() {
+    const actualHeight = getActualPadHeight();
+    // 打开设置时把“现在看到的高度”填进输入框；如果用户正在编辑，不抢走输入焦点。
+    if (document.activeElement !== padHeightInput) padHeightInput.value = String(actualHeight);
+    padHeightSummary.textContent = customPadHeight === null
+      ? `当前约 ${actualHeight} px；默认随宽度变化（宽度的 75%）。`
+      : `当前自定义高度 ${customPadHeight} px；恢复默认后会随宽度变化。`;
+    document.getElementById('resetPadHeight').disabled = customPadHeight === null;
+  }
+  function setCustomPadHeight(value) {
+    const rawValue = String(value).trim();
+    const numericValue = Number(rawValue);
+    if (!rawValue || !Number.isFinite(numericValue)) return false;
+    customPadHeight = Math.max(80, Math.min(1600, Math.round(numericValue)));
+    localStorage.setItem(padHeightStorageKey, String(customPadHeight));
+    pad.style.setProperty('--pad-custom-height', `${customPadHeight}px`);
+    renderPadHeightSetting();
+    return true;
+  }
+  function adjustPadHeight(delta) {
+    const currentHeight = Number(padHeightInput.value) || getActualPadHeight();
+    setCustomPadHeight(currentHeight + delta);
+  }
+  document.getElementById('padHeightDown').addEventListener('click', () => adjustPadHeight(-10));
+  document.getElementById('padHeightUp').addEventListener('click', () => adjustPadHeight(10));
+  padHeightInput.addEventListener('change', () => {
+    if (!setCustomPadHeight(padHeightInput.value)) renderPadHeightSetting();
+  });
+  padHeightInput.addEventListener('keydown', event => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      padHeightInput.blur();
+    }
+  });
+  document.getElementById('resetPadHeight').addEventListener('click', () => {
+    customPadHeight = null;
+    localStorage.removeItem(padHeightStorageKey);
+    pad.style.removeProperty('--pad-custom-height');
+    requestAnimationFrame(renderPadHeightSetting);
+  });
+  if ('ResizeObserver' in window) {
+    new ResizeObserver(() => {
+      if (pad.getBoundingClientRect().height > 0) lastMeasuredPadHeight = pad.getBoundingClientRect().height;
+      if (document.querySelector('[data-view="settings"]').classList.contains('active')) renderPadHeightSetting();
+    }).observe(pad);
+  }
+  window.addEventListener('resize', () => {
+    if (document.querySelector('[data-view="settings"]').classList.contains('active')) renderPadHeightSetting();
+  });
 
   function renderIntroPreference() {
     const toggle = document.getElementById('introToggle');
@@ -585,6 +720,22 @@
   }
   document.getElementById('fullscreenButton').addEventListener('click', toggleFullscreen);
 
+  function setPadExpanded(expanded) {
+    pad.classList.toggle('expanded', expanded);
+    document.documentElement.classList.toggle('pad-expanded', expanded);
+    document.body.classList.toggle('pad-expanded', expanded);
+    padExpandButton.setAttribute('aria-expanded', String(expanded));
+    padExpandButton.setAttribute('aria-label', expanded ? '收起触控板' : '展开触控板');
+    padExpandButton.title = expanded ? '收起触控板' : '展开触控板';
+  }
+  padExpandButton.addEventListener('click', event => {
+    event.stopPropagation();
+    setPadExpanded(!pad.classList.contains('expanded'));
+  });
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && pad.classList.contains('expanded')) setPadExpanded(false);
+  });
+
   function setMode(mode) {
     activeMode = mode;
     document.querySelectorAll('.mode-button').forEach(button => {
@@ -628,7 +779,7 @@
   document.getElementById('continueSecureButton').addEventListener('click', () => {
     if (!pendingSecureUrl) { showToast('请先准备电视安全连接'); return; }
     // HTTPS 与 HTTP 的 localStorage 相互隔离；用 fragment 单向迁移设置，避免把片名附到请求地址。
-    const keys = ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity','airmouse-tv-intro-seen','airmouse-tv-show-intro'];
+    const keys = ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity','airmouse-tv-touch-sensitivity','airmouse-tv-intro-seen','airmouse-tv-show-intro'];
     const transfer = Object.fromEntries(keys.map(key => [key, localStorage.getItem(key)]).filter(([, value]) => value !== null));
     const secureUrl = new URL(pendingSecureUrl);
     let fragment = new URLSearchParams({ 'airmouse-transfer':JSON.stringify(transfer) }).toString();
@@ -646,6 +797,8 @@
 
   pad.addEventListener('pointerdown', event => {
     if (activeMode !== 'touch') return;
+    // 展开/收起按钮位于触控板内部；跳过指针转发，避免按 UI 被电视识别成点击。
+    if (event.target.closest('#padExpandButton')) return;
     event.preventDefault();
     pad.setPointerCapture(event.pointerId);
     pointerState = { id:event.pointerId, x:event.clientX, y:event.clientY, moved:false };
@@ -658,7 +811,7 @@
     pointerState.x = event.clientX;
     pointerState.y = event.clientY;
     if (Math.abs(dx) + Math.abs(dy) > 1) pointerState.moved = true;
-    if (pointerState.moved) send({ type:'move', dx:dx * 2.2, dy:dy * 2.2 });
+    if (pointerState.moved) send({ type:'move', dx:dx * touchSensitivity, dy:dy * touchSensitivity });
   });
   function finishPointer(event) {
     if (!pointerState || event.pointerId !== pointerState.id) return;
@@ -970,7 +1123,7 @@
   document.getElementById('dragToggle').addEventListener('click', event => {
     dragMode = !dragMode;
     event.currentTarget.setAttribute('aria-pressed', String(dragMode));
-    event.currentTarget.textContent = `拖动模式：${dragMode ? '开' : '关'}`;
+    event.currentTarget.textContent = `拖动：${dragMode ? '开' : '关'}`;
   });
 
   document.getElementById('newSceneButton').addEventListener('click', () => {
@@ -1138,6 +1291,19 @@
     gyroSensitivity = Number(sensitivityControl.value);
     localStorage.setItem('airmouse-tv-gyro-sensitivity', String(gyroSensitivity));
   });
+  const touchSensitivityControl = document.getElementById('touchSensitivity');
+  const touchSensitivityValue = document.getElementById('touchSensitivityValue');
+  function renderTouchSensitivity() {
+    touchSensitivityControl.value = String(touchSensitivity);
+    touchSensitivityValue.value = `${touchSensitivity.toFixed(1)}×`;
+    touchSensitivityValue.textContent = `${touchSensitivity.toFixed(1)}×`;
+  }
+  touchSensitivityControl.addEventListener('input', () => {
+    touchSensitivity = Number(touchSensitivityControl.value);
+    localStorage.setItem(touchSensitivityStorageKey, String(touchSensitivity));
+    renderTouchSensitivity();
+  });
+  renderTouchSensitivity();
   let audioContext;
   function playClickFeedback() {
     if (feedbackPreferences.vibration && typeof navigator.vibrate === 'function') navigator.vibrate(12);
