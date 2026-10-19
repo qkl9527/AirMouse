@@ -11,7 +11,6 @@ import org.bouncycastle.asn1.x509.KeyPurposeId
 import org.bouncycastle.asn1.x509.KeyUsage
 import org.bouncycastle.cert.jcajce.JcaX509CertificateConverter
 import org.bouncycastle.cert.jcajce.JcaX509v3CertificateBuilder
-import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.bouncycastle.operator.jcajce.JcaContentSignerBuilder
 import org.bouncycastle.openssl.jcajce.JcaPEMWriter
 import java.io.File
@@ -23,7 +22,6 @@ import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.KeyStore
 import java.security.SecureRandom
-import java.security.Security
 import java.security.cert.X509Certificate
 import java.util.Date
 import javax.net.ssl.KeyManagerFactory
@@ -43,11 +41,11 @@ internal object LocalTlsIdentity {
     data class ServerIdentity(
         val keyManagers: Array<KeyManager>,
         val caCertificatePem: String,
+        val caCertificateDer: ByteArray,
         val fingerprint: String,
     )
 
     fun create(context: Context, hostAddress: String): ServerIdentity {
-        if (Security.getProvider("BC") == null) Security.addProvider(BouncyCastleProvider())
         val root = loadOrCreateRoot(context.applicationContext)
         val leafPair = generateRsaKeyPair()
         val leafCertificate = issueServerCertificate(root, leafPair, hostAddress)
@@ -65,6 +63,7 @@ internal object LocalTlsIdentity {
         return ServerIdentity(
             keyManagers = keyManagers,
             caCertificatePem = toPem(root.certificate),
+            caCertificateDer = root.certificate.encoded,
             fingerprint = sha256Fingerprint(root.certificate),
         )
     }
@@ -151,8 +150,10 @@ internal object LocalTlsIdentity {
         signingKey: java.security.PrivateKey,
         issuerPublicKey: java.security.PublicKey,
     ): X509Certificate {
-        val signer = JcaContentSignerBuilder("SHA256withRSA").setProvider("BC").build(signingKey)
-        return JcaX509CertificateConverter().setProvider("BC").getCertificate(builder.build(signer)).apply {
+        // Android P 起系统 BC provider 不再提供 SHA256withRSA；让 JCA 选择 Android 默认 provider。
+        // Bouncy Castle 仍负责 ASN.1/X.509 结构构造，RSA 签名与证书转换交给平台密码学实现。
+        val signer = JcaContentSignerBuilder("SHA256withRSA").build(signingKey)
+        return JcaX509CertificateConverter().getCertificate(builder.build(signer)).apply {
             verify(issuerPublicKey)
         }
     }

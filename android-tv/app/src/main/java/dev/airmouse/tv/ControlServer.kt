@@ -3,6 +3,7 @@ package dev.airmouse.tv
 import android.content.Context
 import android.content.Intent
 import android.util.Base64
+import android.util.Log
 import org.json.JSONObject
 import java.io.BufferedInputStream
 import java.io.ByteArrayOutputStream
@@ -23,6 +24,7 @@ import java.security.MessageDigest
 import java.security.SecureRandom
 import java.util.Collections
 import java.util.Locale
+import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
@@ -77,6 +79,7 @@ object ControlServer {
     @Volatile private var secureServerThread: Thread? = null
     @Volatile private var applicationContext: Context? = null
     @Volatile private var secureCertificatePem: String? = null
+    @Volatile private var secureCertificateDer: ByteArray? = null
     @Volatile private var secureFingerprint: String? = null
     @Volatile private var pageBytes: ByteArray = ByteArray(0)
     @Volatile private var serverGeneration = 0L
@@ -141,6 +144,7 @@ object ControlServer {
         pairingUrl = null
         listener = null
         secureCertificatePem = null
+        secureCertificateDer = null
         secureFingerprint = null
         runCatching { secureServerSocket?.close() }
         secureServerSocket = null
@@ -214,19 +218,35 @@ object ControlServer {
                 }
 
                 "/certificate" -> {
-                    val certificate = secureCertificatePem?.toByteArray(StandardCharsets.US_ASCII)
-                    if (certificate == null) {
+                    val format = query["format"] ?: "der"
+                    val certificateDer = secureCertificateDer
+                    val certificatePem = secureCertificatePem
+                    if (certificateDer == null || certificatePem == null) {
                         writeHttpError(output, 404, "Secure Mode Not Prepared")
                     } else {
+                        // iOS 用可直接安装的配置描述文件；Android 等设备使用标准 DER 编码证书。
+                        val (body, contentType, filename) = when (format) {
+                            "profile" -> Triple(
+                                appleTrustProfile(certificateDer).toByteArray(StandardCharsets.UTF_8),
+                                "application/x-apple-aspen-config",
+                                "airmouse-tv-trust.mobileconfig",
+                            )
+                            "pem" -> Triple(
+                                certificatePem.toByteArray(StandardCharsets.US_ASCII),
+                                "application/x-pem-file",
+                                "airmouse-tv-ca.pem",
+                            )
+                            else -> Triple(certificateDer, "application/pkix-cert", "airmouse-tv-ca.cer")
+                        }
                         output.write(
                             ("HTTP/1.1 200 OK\r\n" +
-                                "Content-Type: application/x-x509-ca-cert\r\n" +
-                                "Content-Disposition: attachment; filename=airmouse-tv-ca.crt\r\n" +
-                                "Content-Length: ${certificate.size}\r\n" +
+                                "Content-Type: $contentType\r\n" +
+                                "Content-Disposition: attachment; filename=$filename\r\n" +
+                                "Content-Length: ${body.size}\r\n" +
                                 "Cache-Control: no-store\r\n" +
                                 "Connection: close\r\n\r\n").toByteArray(StandardCharsets.ISO_8859_1),
                         )
-                        output.write(certificate)
+                        output.write(body)
                         output.flush()
                     }
                 }
@@ -290,36 +310,57 @@ object ControlServer {
     }
 
     /** 只有用户主动请求空中模式时才建立 TLS 身份和监听端口。 */
-    private fun prepareSecureMode(socket: Socket, clientId: String): Triple<String, String, String>? = synchronized(lifecycleLock) {
+    private fun prepareSecureMode(socket: Socket, clientId: String): Triple<String, String, String> = synchronized(lifecycleLock) {
         // 只为当前已完成 join 身份校验的手机生成安全地址，proof 从服务端记录取回。
-        if (partyClientIds[socket] != clientId) return@synchronized null
-        val partyProof = partyCredentials[clientId] ?: return@synchronized null
-        val expectedPairingUrl = pairingUrl ?: return@synchronized null
-        val host = runCatching { URI(expectedPairingUrl).host }.getOrNull() ?: return@synchronized null
-        val token = pairingToken ?: return@synchronized null
-        val context = applicationContext ?: return@synchronized null
+        check(partyClientIds[socket] == clientId) { "手机连接身份尚未完成校验，请刷新控制页后重试。" }
+        val partyProof = partyCredentials[clientId] ?: error("手机身份凭据已失效，请重新扫码连接。")
+        val expectedPairingUrl = pairingUrl ?: error("电视局域网服务尚未启动。")
+        val host = URI(expectedPairingUrl).host ?: error("无法从电视配对地址读取局域网 IP。")
+        val token = pairingToken ?: error("电视配对令牌已失效，请重新扫码连接。")
+        val context = applicationContext ?: error("电视控制服务上下文已释放，请重新启用服务。")
         var secureServer = secureServerSocket
         var fingerprint: String
 
         if (secureServer?.isClosed != false) {
-            val identity = runCatching { LocalTlsIdentity.create(context, host) }.getOrNull()
-                ?: return@synchronized null
+            val identity = try {
+                LocalTlsIdentity.create(context, host)
+            } catch (error: Exception) {
+                throw IllegalStateException(
+                    "创建电视本地证书失败：${error.localizedMessage ?: error.javaClass.simpleName}",
+                    error,
+                )
+            }
             val tlsContext = SSLContext.getInstance("TLS").apply {
                 init(identity.keyManagers, null, SecureRandom())
             }
             val createdServer = tlsContext.serverSocketFactory.createServerSocket() as SSLServerSocket
             createdServer.reuseAddress = true
             try {
-                runCatching { createdServer.bind(InetSocketAddress(DEFAULT_HTTPS_PORT)) }
-                    .onFailure { createdServer.bind(InetSocketAddress(0)) }
-            } catch (_: IOException) {
-                runCatching { createdServer.close() }
-                return@synchronized null
+                createdServer.bind(InetSocketAddress(DEFAULT_HTTPS_PORT))
+            } catch (preferredPortError: IOException) {
+                try {
+                    // 固定端口被占用时改用临时端口；若两者都失败，把备用端口原因回传给手机。
+                    createdServer.bind(InetSocketAddress(0))
+                } catch (fallbackPortError: IOException) {
+                    runCatching { createdServer.close() }
+                    throw IllegalStateException(
+                        "HTTPS 端口 $DEFAULT_HTTPS_PORT 和临时端口均无法监听：${fallbackPortError.localizedMessage ?: preferredPortError.localizedMessage}",
+                        fallbackPortError,
+                    )
+                }
             }
-            createdServer.enabledProtocols = createdServer.supportedProtocols
+            val secureProtocols = createdServer.supportedProtocols
                 .filter { it == "TLSv1.3" || it == "TLSv1.2" }
                 .toTypedArray()
+            check(secureProtocols.isNotEmpty()) { "电视系统没有可用的 TLS 1.2/1.3 协议。" }
+            try {
+                createdServer.enabledProtocols = secureProtocols
+            } catch (error: Exception) {
+                runCatching { createdServer.close() }
+                throw IllegalStateException("电视系统无法启用 TLS 1.2/1.3：${error.localizedMessage ?: error.javaClass.simpleName}", error)
+            }
             secureCertificatePem = identity.caCertificatePem
+            secureCertificateDer = identity.caCertificateDer
             fingerprint = identity.fingerprint
             secureFingerprint = identity.fingerprint
             TvStatusStore.update { it.copy(secureFingerprint = identity.fingerprint) }
@@ -333,17 +374,56 @@ object ControlServer {
             }
         } else {
             // 复用证书根时返回可在配对页展示的稳定指纹。
-            fingerprint = secureFingerprint ?: return@synchronized null
+            fingerprint = secureFingerprint ?: error("电视安全证书状态丢失，请重启电视控制服务后重试。")
         }
 
-        val activeServer = secureServer ?: return@synchronized null
+        val activeServer = secureServer ?: error("电视 HTTPS 服务未能保持运行。")
         val encodedClient = URLEncoder.encode(clientId, StandardCharsets.UTF_8.name())
         val encodedProof = URLEncoder.encode(partyProof, StandardCharsets.UTF_8.name())
         val encodedToken = URLEncoder.encode(token, StandardCharsets.UTF_8.name())
         val secureUrl = "https://$host:${activeServer.localPort}/?token=$encodedToken&clientId=$encodedClient&partyProof=$encodedProof&mode=air"
-        val httpPort = serverSocket?.localPort ?: return@synchronized null
+        val httpPort = serverSocket?.localPort ?: error("电视 HTTP 配对服务已关闭。")
         val certificateUrl = "http://$host:$httpPort/certificate?token=$encodedToken"
         Triple(secureUrl, certificateUrl, fingerprint)
+    }
+
+    /**
+     * iOS 通过配置描述文件安装根证书，比把 PEM 文本伪装成 .crt 更容易走系统安装流程。
+     * 描述文件只包含公开 CA 证书，不包含电视端私钥；用户仍需在 iOS 设置中启用完整信任。
+     */
+    private fun appleTrustProfile(certificateDer: ByteArray): String {
+        val certificate = Base64.encodeToString(certificateDer, Base64.NO_WRAP)
+        // 以 CA 证书内容生成稳定 UUID，重复下载时 iOS 可识别为同一份描述文件。
+        val certificateId = UUID.nameUUIDFromBytes(certificateDer).toString()
+        val profileId = UUID.nameUUIDFromBytes("airmouse-tv-profile:$certificateId".toByteArray(StandardCharsets.UTF_8)).toString()
+        return """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+            <plist version="1.0">
+            <dict>
+              <key>PayloadContent</key>
+              <array>
+                <dict>
+                  <key>PayloadCertificateFileName</key><string>airmouse-tv-ca.cer</string>
+                  <key>PayloadContent</key><data>$certificate</data>
+                  <key>PayloadDescription</key><string>用于信任 AirMouse 电视的本地 HTTPS 连接。</string>
+                  <key>PayloadDisplayName</key><string>AirMouse 电视信任证书</string>
+                  <key>PayloadIdentifier</key><string>dev.airmouse.tv.localca</string>
+                  <key>PayloadType</key><string>com.apple.security.root</string>
+                  <key>PayloadUUID</key><string>$certificateId</string>
+                  <key>PayloadVersion</key><integer>1</integer>
+                </dict>
+              </array>
+              <key>PayloadDescription</key><string>安装后可在局域网中安全使用 AirMouse 空中飞鼠。</string>
+              <key>PayloadDisplayName</key><string>AirMouse 电视安全连接</string>
+              <key>PayloadIdentifier</key><string>dev.airmouse.tv.trust.$profileId</string>
+              <key>PayloadOrganization</key><string>AirMouse</string>
+              <key>PayloadType</key><string>Configuration</string>
+              <key>PayloadUUID</key><string>$profileId</string>
+              <key>PayloadVersion</key><integer>1</integer>
+            </dict>
+            </plist>
+        """.trimIndent()
     }
 
     private fun webSocketAcceptValue(headers: Map<String, String>): String? {
@@ -418,10 +498,17 @@ object ControlServer {
                         is RemoteAction.EndParty -> withPartyIdentity(socket, output, action.clientId) { id -> PartyRoom.end(id) }
 
                         is RemoteAction.EnableAirMouse -> {
-                            val secureDetails = runCatching { prepareSecureMode(socket, action.clientId) }.getOrNull()
-                            if (secureDetails == null) {
-                                writeTextFrame(output, "{\"type\":\"notice\",\"message\":\"无法准备电视安全连接，请确认电视仍连接局域网后重试。\"}")
-                            } else {
+                            val secureDetails = try {
+                                prepareSecureMode(socket, action.clientId)
+                            } catch (error: Exception) {
+                                Log.e("AirMouseControl", "准备电视 HTTPS 安全连接失败", error)
+                                writeTextFrame(output, JSONObject()
+                                    .put("type", "notice")
+                                    .put("message", "无法准备电视安全连接：${error.message ?: error.javaClass.simpleName}。普通触控遥控仍可用。")
+                                    .toString())
+                                null
+                            }
+                            if (secureDetails != null) {
                                 writeTextFrame(output, JSONObject().apply {
                                     put("type", "secure_ready")
                                     put("secureUrl", secureDetails.first)

@@ -43,6 +43,7 @@
     .trust-steps { display:none; max-width:290px; color:var(--muted); font-size:12px; line-height:1.45; text-align:left; }
     .trust-steps p { margin:7px 0; }
     .trust-steps a { display:block; margin:8px 0; color:var(--mint); text-align:center; }
+    .trust-steps [hidden] { display:none !important; }
     .quick-row { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:10px; }
     .quick-row button { min-width:0; padding:0 5px; font-size:13px; }
     .quick-row .main-action { border-color:var(--mint); background:var(--mint); color:#102017; }
@@ -143,10 +144,11 @@
           <strong>空中飞鼠</strong>
           <span id="airHint">启用后，抬起手机指向电视即可控制指针。</span>
           <div id="trustSteps" class="trust-steps">
-            <p><b>只需设置一次：</b>先下载电视的本地信任证书，再按手机系统说明安装并信任它。证书只用于这台电视的局域网 HTTPS。</p>
-            <a id="certificateDownload" href="#" download="airmouse-tv-ca.crt">下载电视信任证书</a>
-            <p><b>iPhone：</b>在“设置 → 已下载描述文件”安装，再到“通用 → 关于本机 → 证书信任设置”开启完整信任。</p>
-            <p><b>Android：</b>在“设置 → 安全 → 加密与凭据 → 安装证书”中安装 CA 证书，然后回到此页。</p>
+            <p><b>只需设置一次：</b>信任这台电视的局域网证书后，空中飞鼠就能安全连接。</p>
+            <a id="appleProfileDownload" href="#" hidden>为 iPhone 安装信任描述文件</a>
+            <p id="appleTrustHint" hidden>安装后前往“设置 → 通用 → 关于本机 → 证书信任设置”，开启 AirMouse 证书的完整信任。</p>
+            <a id="certificateDownload" href="#" download="airmouse-tv-ca.cer" hidden>下载电视证书（.cer）</a>
+            <p id="androidTrustHint" hidden>下载后在“设置 → 安全 → 加密与凭据 → 安装证书”中选择 CA 证书，再回到此页。</p>
           </div>
           <button id="enableAirButton" class="accent" type="button" disabled>开始设置</button>
           <button id="continueSecureButton" type="button" style="display:none">我已信任，继续</button>
@@ -607,8 +609,29 @@
 
   function showSecureSetup(message) {
     pendingSecureUrl = message.secureUrl || '';
-    const download = document.getElementById('certificateDownload');
-    download.href = message.certificateUrl || '#';
+    const certificateUrl = new URL(message.certificateUrl || '#', location.href);
+    const isAppleMobile = /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    const isAndroid = /Android/i.test(navigator.userAgent);
+    const appleProfileDownload = document.getElementById('appleProfileDownload');
+    const certificateDownload = document.getElementById('certificateDownload');
+    if (message.certificateUrl) {
+      const profileUrl = new URL(certificateUrl);
+      profileUrl.searchParams.set('format', 'profile');
+      appleProfileDownload.href = profileUrl.toString();
+      const derUrl = new URL(certificateUrl);
+      derUrl.searchParams.set('format', 'der');
+      certificateDownload.href = derUrl.toString();
+    }
+    // 按当前手机系统只显示对应入口，避免用户在信任步骤里先做格式选择题。
+    appleProfileDownload.hidden = !isAppleMobile;
+    document.getElementById('appleTrustHint').hidden = !isAppleMobile;
+    certificateDownload.hidden = isAppleMobile;
+    document.getElementById('androidTrustHint').hidden = isAppleMobile;
+    if (!isAppleMobile && !isAndroid) {
+      appleProfileDownload.hidden = false;
+      document.getElementById('appleTrustHint').hidden = false;
+    }
     document.getElementById('trustSteps').style.display = 'block';
     document.getElementById('airHint').textContent = `电视安全地址已准备好。请下载并信任证书，然后继续。请先核对电视屏幕上的 SHA-256 指纹：${message.fingerprint || '电视端当前未显示指纹'}`;
     document.getElementById('enableAirButton').style.display = 'none';
