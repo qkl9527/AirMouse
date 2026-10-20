@@ -34,14 +34,14 @@ Debug 包由 Android 工具自动使用本机的调试密钥签名，适合开�
 
 ## 2. 自动构建和发布的触发规则
 
-Workflow：仓库根目录 `.github/workflows/android-apk.yml`，Actions 页面显示为 **Android APK**。
+Workflow：仓库根目录 `.github/workflows/android-apk.yml`，Actions 页面显示为 **AirMouse TV APK**。
 
 | 操作 | 结果 | 下载位置 |
 | --- | --- | --- |
 | 向 `main` / `master` 推送包含 Android 工程或此 Workflow 修改的提交 | 构建 Debug APK | Actions → 对应运行 → Artifacts |
 | 提交修改上述文件的 Pull Request | 构建 Debug APK，不读取发布签名 | Actions → 对应运行 → Artifacts |
-| Actions → Android APK → Run workflow | 手动构建所选分支的 Debug APK | Actions → 对应运行 → Artifacts |
-| 推送 `android-vX.Y.Z` 标签 | 构建固定签名 Release APK，自动创建 Release 并上传 APK 与 SHA-256 文件 | 仓库 Releases |
+| Actions → AirMouse TV APK → Run workflow | 手动构建所选分支的 Debug APK | Actions → 对应运行 → Artifacts |
+| 推送 `airmouse-tv-vX.Y.Z` 标签 | 构建固定签名 Release APK，自动创建 Release 并上传 APK 与 SHA-256 文件 | 仓库 Releases |
 
 Actions Artifacts 保留 30 天，下载后先解压 ZIP 获取 APK；Releases 中可以直接下载 APK。只修改 `desktop/` 不触发 Android 分支构建。标签推送不受路径过滤限制。
 
@@ -108,23 +108,23 @@ git push origin main
 这时会自动构建 Debug 包。要正式发布，在要发布的提交上创建并推送新版本标签：
 
 ```bash
-git tag -a android-v1.0.1 -m "AirMouse TV 1.0.1"
-git push origin android-v1.0.1
+git tag -a airmouse-tv-v1.0.1 -m "AirMouse TV 1.0.1"
+git push origin airmouse-tv-v1.0.1
 ```
 
-随后打开 GitHub → Actions → Android APK 查看进度。成功后在 **Releases → AirMouse TV 1.0.1** 下载：
+随后打开 GitHub → Actions → AirMouse TV APK 查看进度。成功后在 **Releases → AirMouse TV 1.0.1** 下载：
 
 ```text
 AirMouse-TV-1.0.1-release.apk
 AirMouse-TV-1.0.1-release.apk.sha256
 ```
 
-以后每次发布，只需提交、推送代码，再推送一个递增的新标签，例如 `android-v1.0.2`。只运行 `git commit` 或未推送的本地标签不会触发 GitHub Actions。不要把已经发布的标签移到其他提交，也不要复用旧标签发布不同代码。
+以后每次发布，只需提交、推送代码，再推送一个递增的新标签，例如 `airmouse-tv-v1.0.2`。只运行 `git commit` 或未推送的本地标签不会触发 GitHub Actions。不要把已经发布的标签移到其他提交，也不要复用旧标签发布不同代码。
 
 ### 版本号规则
 
-- 标签必须是 `android-vX.Y.Z`，例如 `android-v1.0.1`。
-- 每段为 `0..999`，不允许前导零、`-beta` 等后缀，不接受 `android-v0.0.0`。
+- 标签必须是 `airmouse-tv-vX.Y.Z`，例如 `airmouse-tv-v1.0.1`。
+- 每段为 `0..999`，不允许前导零、`-beta` 等后缀，不接受 `airmouse-tv-v0.0.0`。
 - APK `versionName` 自动取 `X.Y.Z`。
 - APK `versionCode` 自动计算为 `X × 1000000 + Y × 1000 + Z`，例如 `1.0.1 → 1000001`、`1.1.0 → 1001000`。发布时按版本大小递增，才能覆盖升级。
 - 本地 Debug 默认仍为 `versionName=1.0.0`、`versionCode=1`。

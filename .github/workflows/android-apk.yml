@@ -1,10 +1,10 @@
-name: Android APK
+name: AirMouse TV APK
 
 # 分支提交/PR 产生可下载的调试包；只有版本标签才公开发布正式包。
 on:
   push:
     branches: [main, master]
-    tags: ['android-v*']
+    tags: ['airmouse-tv-v*']
     paths:
       - 'android-tv/**'
       - '.github/workflows/android-apk.yml'
@@ -50,13 +50,13 @@ jobs:
           release = os.environ['GITHUB_EVENT_NAME'] == 'push' and os.environ['GITHUB_REF_TYPE'] == 'tag'
           if release:
               tag = os.environ['GITHUB_REF_NAME']
-              match = re.fullmatch(r'android-v(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})', tag)
+              match = re.fullmatch(r'airmouse-tv-v(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})', tag)
               if not match:
-                  raise SystemExit('版本标签必须为 android-vX.Y.Z；每段为 0..999，不允许前导零或预发布后缀')
+                  raise SystemExit('版本标签必须为 airmouse-tv-vX.Y.Z；每段为 0..999，不允许前导零或预发布后缀')
               major, minor, patch = map(int, match.groups())
               code = major * 1000000 + minor * 1000 + patch
               if code == 0:
-                  raise SystemExit('不能发布 android-v0.0.0：Android versionCode 必须大于零')
+                  raise SystemExit('不能发布 airmouse-tv-v0.0.0：Android versionCode 必须大于零')
               version = '.'.join(match.groups())
               artifact = f'AirMouse-TV-{version}-release'
           else:
@@ -145,7 +145,7 @@ jobs:
 
   publish:
     # 构建成功后，只有标签推送允许写入 GitHub Releases。
-    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/android-v')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/airmouse-tv-v')
     needs: build
     runs-on: ubuntu-24.04
     timeout-minutes: 10

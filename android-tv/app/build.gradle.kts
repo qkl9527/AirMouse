@@ -3,7 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
 }
 
-// 本地 Debug 仍使用默认版本；CI 从 android-vX.Y.Z 标签传入正式版本号。
+// 本地 Debug 仍使用默认版本；CI 从 airmouse-tv-vX.Y.Z 标签传入正式版本号。
 val apkVersionName = providers.gradleProperty("airmouseVersionName").orElse("1.0.0").get()
 val apkVersionCode = providers.gradleProperty("airmouseVersionCode").orElse("1").get().toInt()
 require(apkVersionCode in 1..2100000000) { "airmouseVersionCode 必须在 1..2100000000 之间" }
