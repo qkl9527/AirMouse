@@ -1,29 +1,21 @@
 name: AirMouse TV APK
 
-# 分支提交/PR 产生可下载的调试包；只有版本标签才公开发布正式包。
+# 仅版本标签触发构建和发布；普通分支提交、PR 不运行此 Workflow。
 on:
   push:
-    branches: [main, master]
     tags: ['airmouse-tv-v*']
-    paths:
-      - 'android-tv/**'
-      - '.github/workflows/android-apk.yml'
-  pull_request:
-    paths:
-      - 'android-tv/**'
-      - '.github/workflows/android-apk.yml'
-  workflow_dispatch:
 
 permissions:
   contents: read
 
 concurrency:
   group: android-apk-${{ github.workflow }}-${{ github.ref }}
-  # 正式发布不因同一标签的再次触发中断；普通分支只保留最新构建。
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  # 正式发布不因同一标签的再次触发中断。
+  cancel-in-progress: false
 
 jobs:
   build:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/airmouse-tv-v')
     # 固定发行版，避免 ubuntu-latest 迁移到 Ubuntu 26.04 时构建环境随之变化。
     runs-on: ubuntu-24.04
     timeout-minutes: 30
@@ -39,29 +31,26 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: 确定构建类型与版本
+      - name: 从发布标签解析版本
         id: version
         run: |
           python3 - <<'PY'
           import os
           import re
 
-          # 手动运行始终构建 Debug；发布必须推送明确的版本标签。
-          release = os.environ['GITHUB_EVENT_NAME'] == 'push' and os.environ['GITHUB_REF_TYPE'] == 'tag'
-          if release:
-              tag = os.environ['GITHUB_REF_NAME']
-              match = re.fullmatch(r'airmouse-tv-v(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})', tag)
-              if not match:
-                  raise SystemExit('版本标签必须为 airmouse-tv-vX.Y.Z；每段为 0..999，不允许前导零或预发布后缀')
-              major, minor, patch = map(int, match.groups())
-              code = major * 1000000 + minor * 1000 + patch
-              if code == 0:
-                  raise SystemExit('不能发布 airmouse-tv-v0.0.0：Android versionCode 必须大于零')
-              version = '.'.join(match.groups())
-              artifact = f'AirMouse-TV-{version}-release'
-          else:
-              version, code = '1.0.0', 1
-              artifact = f'AirMouse-TV-debug-{os.environ["GITHUB_SHA"][:7]}'
+          # 标签前缀由触发器筛选；这里再检查完整版本格式，错误时在准备密钥前停止。
+          if os.environ['GITHUB_EVENT_NAME'] != 'push' or os.environ['GITHUB_REF_TYPE'] != 'tag':
+              raise SystemExit('仅允许通过推送版本标签构建正式 APK')
+          tag = os.environ['GITHUB_REF_NAME']
+          match = re.fullmatch(r'airmouse-tv-v(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})', tag)
+          if not match:
+              raise SystemExit('版本标签必须为 airmouse-tv-vX.Y.Z；每段为 0..999，不允许前导零或预发布后缀')
+          major, minor, patch = map(int, match.groups())
+          code = major * 1000000 + minor * 1000 + patch
+          if code == 0:
+              raise SystemExit('不能发布 airmouse-tv-v0.0.0：Android versionCode 必须大于零')
+          version = '.'.join(match.groups())
+          artifact = f'AirMouse-TV-{version}-release'
           with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
               output.write(f'version={version}\ncode={code}\nartifact={artifact}\n')
           PY
@@ -80,11 +69,10 @@ jobs:
       - name: 配置 Gradle 缓存及 Wrapper 校验
         uses: gradle/actions/setup-gradle@v6
         with:
-          # PR 和 Release 不回写缓存；下方构建命令另行禁用配置缓存以避免保存签名环境。
-          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref_type == 'tag' }}
+          # 正式发布不回写缓存；下方构建命令另行禁用配置缓存以避免保存签名环境。
+          cache-read-only: true
 
       - name: 准备正式签名
-        if: github.event_name == 'push' && github.ref_type == 'tag'
         env:
           KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -100,12 +88,7 @@ jobs:
           umask 077
           printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/airmouse-release.jks"
 
-      - name: 构建 Debug APK
-        if: github.event_name != 'push' || github.ref_type != 'tag'
-        run: ./gradlew :app:assembleDebug --no-daemon --no-configuration-cache
-
       - name: 构建签名 Release APK
-        if: github.event_name == 'push' && github.ref_type == 'tag'
         env:
           ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/airmouse-release.jks
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -122,12 +105,8 @@ jobs:
         env:
           ARTIFACT_NAME: ${{ steps.version.outputs.artifact }}
         run: |
-          variant=debug
-          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then
-            variant=release
-          fi
           mkdir -p artifacts
-          cp "app/build/outputs/apk/$variant/app-$variant.apk" "artifacts/$ARTIFACT_NAME.apk"
+          cp app/build/outputs/apk/release/app-release.apk "artifacts/$ARTIFACT_NAME.apk"
           cd artifacts
           sha256sum "$ARTIFACT_NAME.apk" > "$ARTIFACT_NAME.apk.sha256"
 

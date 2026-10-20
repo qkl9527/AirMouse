@@ -38,14 +38,13 @@ Workflow：仓库根目录 `.github/workflows/android-apk.yml`，Actions 页面�
 
 | 操作 | 结果 | 下载位置 |
 | --- | --- | --- |
-| 向 `main` / `master` 推送包含 Android 工程或此 Workflow 修改的提交 | 构建 Debug APK | Actions → 对应运行 → Artifacts |
-| 提交修改上述文件的 Pull Request | 构建 Debug APK，不读取发布签名 | Actions → 对应运行 → Artifacts |
-| Actions → AirMouse TV APK → Run workflow | 手动构建所选分支的 Debug APK | Actions → 对应运行 → Artifacts |
+| 向 `main` / `master` 或其他分支推送提交 | 不触发构建或发布 | — |
+| 创建或更新 Pull Request | 不触发构建或发布 | — |
 | 推送 `airmouse-tv-vX.Y.Z` 标签 | 构建固定签名 Release APK，自动创建 Release 并上传 APK 与 SHA-256 文件 | 仓库 Releases |
 
-Actions Artifacts 保留 30 天，下载后先解压 ZIP 获取 APK；Releases 中可以直接下载 APK。只修改 `desktop/` 不触发 Android 分支构建。标签推送不受路径过滤限制。
+正式构建的 Actions Artifacts 保留 30 天，下载后先解压 ZIP 获取 APK；Releases 中可以直接下载 APK。标签推送不受文件路径限制，构建标签所指向的提交。
 
-`workflow_dispatch` 手动运行始终生成 Debug 包，正式发布通过推送标签触发。Workflow 首次进入默认分支后，Actions 页面才提供手动运行入口。如果 fork 仓库尚未开启 Actions，需要先在 Actions 页面启用。
+此 Workflow 只保留标签推送触发，不提供 `workflow_dispatch` 手动构建入口。Debug 包请按第 1 节在本地构建。如果 fork 仓库尚未开启 Actions，需要先在 Actions 页面启用。
 
 ### 构建环境和日志提示
 
@@ -105,7 +104,7 @@ git commit -m "ci: add Android APK build and release"
 git push origin main
 ```
 
-这时会自动构建 Debug 包。要正式发布，在要发布的提交上创建并推送新版本标签：
+推送分支提交后不会构建 APK。要正式发布，在包含最新 Workflow 的目标提交上创建并推送新版本标签：
 
 ```bash
 git tag -a airmouse-tv-v1.0.1 -m "AirMouse TV 1.0.1"
@@ -133,7 +132,7 @@ AirMouse-TV-1.0.1-release.apk.sha256
 
 如果电视上安装的是之前本地构建的 Debug 包，它的签名通常与新 Release 密钥不同，不能直接 `adb install -r` 覆盖。需要先卸载旧包，再安装正式包；**卸载会清除应用设置和保存在电视上的 HTTPS 证书身份，之后需要重新授权、配对，并按需重新信任证书**。确认迁移后再卸载。以后正式包使用相同签名和递增版本号即可覆盖升级。
 
-GitHub Debug 构建运行在临时机器上，不保证各次 Debug 包与本机或历史 CI Debug 包的签名一致；长期安装和升级请使用 Release 包。
+历史 GitHub Debug 包由临时机器签名，可能与本机或其他历史 Debug 包签名不同；长期安装和升级请使用 Release 包。当前 Workflow 只构建正式包。
 
 ## 5. 本地构建正式包
 
