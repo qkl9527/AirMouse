@@ -37,5 +37,3 @@ uv run python server.py
 3. **手机扫码连接。** 确保手机与电视连接同一局域网，回到电视上的 AirMouse 首页，用手机扫码打开控制网页，即可使用触摸板或键盘。输入文字前，先在电视上选中搜索框等输入位置。
 
 不同电视的系统菜单名称可能不同；若 App 按钮无法打开对应设置，可从电视系统设置中手动进入。详细说明见 [Android TV 使用说明](android-tv/README.md)。
-
-已提供 [Android APK 自动构建与发布流程](android-tv/RELEASING.md)：仅推送 `airmouse-tv-vX.Y.Z` 标签时构建签名 APK 并发布到 GitHub Releases，普通分支提交和 Pull Request 不触发构建。
