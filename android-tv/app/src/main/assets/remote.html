@@ -315,7 +315,7 @@
       </div>
       <div id="remotePageTrack" class="remote-page-track" aria-label="遥控方式">
         <section class="remote-page remote-page-touch active" data-control-page="touch" role="tabpanel" aria-label="触控板遥控">
-          <div id="pad" class="pad" aria-label="电视触控板" data-hint="在这里滑动，电视指针会跟着移动">
+          <div id="pad" class="pad" aria-label="电视触控板" data-hint="单指移动指针，双指上下滚动">
             <div class="pad-cross"></div>
             <button id="padExpandButton" class="pad-expand-button" type="button" aria-label="展开触控板" aria-expanded="false" title="展开触控板">
               <svg class="expand-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/></svg>
@@ -503,6 +503,10 @@
   let reconnectTimer;
   let toastTimer;
   let pointerState = null;
+  const activePadPointers = new Map();
+  let pendingPadScroll = 0;
+  let padScrollTimer = null;
+  let lastPadScrollSentAt = 0;
   let dragMode = false;
   let activeMode = 'touch';
   let introCountdownSeconds = 30;
@@ -795,26 +799,76 @@
     window.location.assign(secureUrl.toString());
   });
 
+  function padPointersCenterY() {
+    const positions = [...activePadPointers.values()];
+    return positions.reduce((sum, point) => sum + point.y, 0) / positions.length;
+  }
+  function flushPadScroll() {
+    padScrollTimer = null;
+    const dy = Math.max(-800, Math.min(800, pendingPadScroll));
+    pendingPadScroll = 0;
+    if (!dy) return;
+    lastPadScrollSentAt = performance.now();
+    send({ type:'scroll', dx:0, dy });
+  }
+  function queuePadScroll(deltaY) {
+    pendingPadScroll += deltaY * touchSensitivity;
+    if (Math.abs(pendingPadScroll) < 12 || padScrollTimer !== null) return;
+    // Android 的无障碍滑动手势约持续 260ms；节流并合并移动量，避免连续手势互相取消。
+    const wait = Math.max(0, 260 - (performance.now() - lastPadScrollSentAt));
+    padScrollTimer = window.setTimeout(flushPadScroll, wait);
+  }
   pad.addEventListener('pointerdown', event => {
     if (activeMode !== 'touch') return;
     // 展开/收起按钮位于触控板内部；跳过指针转发，避免按 UI 被电视识别成点击。
     if (event.target.closest('#padExpandButton')) return;
     event.preventDefault();
     pad.setPointerCapture(event.pointerId);
-    pointerState = { id:event.pointerId, x:event.clientX, y:event.clientY, moved:false };
-    if (dragMode) send({ type:'drag_start' });
+    activePadPointers.set(event.pointerId, { x:event.clientX, y:event.clientY });
+    if (!pointerState) {
+      pointerState = { id:event.pointerId, x:event.clientX, y:event.clientY, moved:false, scrolling:false };
+      if (dragMode) send({ type:'drag_start' });
+      return;
+    }
+    if (activePadPointers.size >= 2) {
+      // 第二根手指接入后锁定为滚动手势；抑制单指点击/移动，并结束可能开始的拖动。
+      if (!pointerState.scrolling && dragMode) send({ type:'drag_end' });
+      pointerState.scrolling = true;
+      pointerState.moved = true;
+      pointerState.lastScrollCenterY = padPointersCenterY();
+    }
   });
   pad.addEventListener('pointermove', event => {
-    if (!pointerState || event.pointerId !== pointerState.id) return;
-    const dx = event.clientX - pointerState.x;
-    const dy = event.clientY - pointerState.y;
+    if (!pointerState || !activePadPointers.has(event.pointerId)) return;
+    event.preventDefault();
+    const previous = activePadPointers.get(event.pointerId);
+    activePadPointers.set(event.pointerId, { x:event.clientX, y:event.clientY });
+    if (pointerState.scrolling) {
+      if (activePadPointers.size < 2) return;
+      const centerY = padPointersCenterY();
+      const deltaY = centerY - pointerState.lastScrollCenterY;
+      pointerState.lastScrollCenterY = centerY;
+      if (Math.abs(deltaY) > 0.1) queuePadScroll(deltaY);
+      return;
+    }
+    if (event.pointerId !== pointerState.id) return;
+    const dx = event.clientX - previous.x;
+    const dy = event.clientY - previous.y;
     pointerState.x = event.clientX;
     pointerState.y = event.clientY;
     if (Math.abs(dx) + Math.abs(dy) > 1) pointerState.moved = true;
     if (pointerState.moved) send({ type:'move', dx:dx * touchSensitivity, dy:dy * touchSensitivity });
   });
   function finishPointer(event) {
-    if (!pointerState || event.pointerId !== pointerState.id) return;
+    if (!activePadPointers.has(event.pointerId)) return;
+    activePadPointers.delete(event.pointerId);
+    if (!pointerState) return;
+    if (pointerState.scrolling) {
+      // 两指手势中抬起一指后仍屏蔽单指操作，直到所有手指离开触控板。
+      if (activePadPointers.size === 0) pointerState = null;
+      return;
+    }
+    if (event.pointerId !== pointerState.id) return;
     if (dragMode) send({ type:'drag_end' });
     else if (!pointerState.moved) {
       send({ type:'click', count:1 });
@@ -1327,7 +1381,7 @@
     if (event.target.closest('button') && !event.target.closest('button').disabled) playClickFeedback();
   });
 
-  window.addEventListener('pagehide', () => { clearTimeout(reconnectTimer); socket?.close(); });
+  window.addEventListener('pagehide', () => { clearTimeout(reconnectTimer); clearTimeout(padScrollTimer); socket?.close(); });
   connect();
   renderScenes();
   renderFeedbackPreferences();
