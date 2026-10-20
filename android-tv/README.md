@@ -40,6 +40,12 @@ app/build/outputs/apk/debug/app-debug.apk
 adb install -r app/build/outputs/apk/debug/app-debug.apk
 ```
 
+## 自动构建与发布
+
+仓库已提供 GitHub Actions Workflow：主分支 Android 相关提交和 Pull Request 自动生成 Debug APK；推送 `android-v1.0.1` 这样的版本标签后，自动构建签名 Release APK 并上传 GitHub Releases。
+
+正式发布前需一次性配置固定签名的四项 GitHub Secrets。完整的本地打包、签名配置、提交与版本标签命令见 [APK 打包与发布说明](RELEASING.md)。
+
 ## 首次设置与配对
 
 1. 电视和手机连接同一个 Wi-Fi 或局域网。

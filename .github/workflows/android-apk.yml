@@ -1,0 +1,172 @@
+name: Android APK
+
+# 分支提交/PR 产生可下载的调试包；只有版本标签才公开发布正式包。
+on:
+  push:
+    branches: [main, master]
+    tags: ['android-v*']
+    paths:
+      - 'android-tv/**'
+      - '.github/workflows/android-apk.yml'
+  pull_request:
+    paths:
+      - 'android-tv/**'
+      - '.github/workflows/android-apk.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-apk-${{ github.workflow }}-${{ github.ref }}
+  # 正式发布不因同一标签的再次触发中断；普通分支只保留最新构建。
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    outputs:
+      artifact: ${{ steps.version.outputs.artifact }}
+      version: ${{ steps.version.outputs.version }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: android-tv
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: 确定构建类型与版本
+        id: version
+        run: |
+          python3 - <<'PY'
+          import os
+          import re
+
+          # 手动运行始终构建 Debug；发布必须推送明确的版本标签。
+          release = os.environ['GITHUB_EVENT_NAME'] == 'push' and os.environ['GITHUB_REF_TYPE'] == 'tag'
+          if release:
+              tag = os.environ['GITHUB_REF_NAME']
+              match = re.fullmatch(r'android-v(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})', tag)
+              if not match:
+                  raise SystemExit('版本标签必须为 android-vX.Y.Z；每段为 0..999，不允许前导零或预发布后缀')
+              major, minor, patch = map(int, match.groups())
+              code = major * 1000000 + minor * 1000 + patch
+              if code == 0:
+                  raise SystemExit('不能发布 android-v0.0.0：Android versionCode 必须大于零')
+              version = '.'.join(match.groups())
+              artifact = f'AirMouse-TV-{version}-release'
+          else:
+              version, code = '1.0.0', 1
+              artifact = f'AirMouse-TV-debug-{os.environ["GITHUB_SHA"][:7]}'
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'version={version}\ncode={code}\nartifact={artifact}\n')
+          PY
+
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 安装 Android SDK
+        uses: android-actions/setup-android@v4
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+
+      - name: 配置 Gradle 缓存及 Wrapper 校验
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          # PR 和 Release 不回写缓存；下方构建命令另行禁用配置缓存以避免保存签名环境。
+          cache-read-only: ${{ github.event_name == 'pull_request' || github.ref_type == 'tag' }}
+
+      - name: 准备正式签名
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          for name in KEYSTORE_BASE64 STORE_PASSWORD KEY_ALIAS KEY_PASSWORD; do
+            if [[ -z "${!name}" ]]; then
+              echo "::error::缺少 Android 发布签名 Secret，配置方法见 android-tv/RELEASING.md"
+              exit 1
+            fi
+          done
+          umask 077
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/airmouse-release.jks"
+
+      - name: 构建 Debug APK
+        if: github.event_name != 'push' || github.ref_type != 'tag'
+        run: ./gradlew :app:assembleDebug --no-daemon --no-configuration-cache
+
+      - name: 构建签名 Release APK
+        if: github.event_name == 'push' && github.ref_type == 'tag'
+        env:
+          ANDROID_KEYSTORE_PATH: ${{ runner.temp }}/airmouse-release.jks
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          APK_VERSION_NAME: ${{ steps.version.outputs.version }}
+          APK_VERSION_CODE: ${{ steps.version.outputs.code }}
+        run: |
+          ./gradlew :app:assembleRelease --no-daemon --no-configuration-cache \
+            -PairmouseVersionName="$APK_VERSION_NAME" \
+            -PairmouseVersionCode="$APK_VERSION_CODE"
+
+      - name: 整理 APK 和 SHA-256 校验文件
+        env:
+          ARTIFACT_NAME: ${{ steps.version.outputs.artifact }}
+        run: |
+          variant=debug
+          if [[ "$GITHUB_EVENT_NAME" == push && "$GITHUB_REF_TYPE" == tag ]]; then
+            variant=release
+          fi
+          mkdir -p artifacts
+          cp "app/build/outputs/apk/$variant/app-$variant.apk" "artifacts/$ARTIFACT_NAME.apk"
+          cd artifacts
+          sha256sum "$ARTIFACT_NAME.apk" > "$ARTIFACT_NAME.apk.sha256"
+
+      - name: 上传构建产物（保留 30 天）
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.version.outputs.artifact }}
+          path: android-tv/artifacts/*
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: 清理临时签名文件
+        if: always()
+        run: rm -f "$RUNNER_TEMP/airmouse-release.jks"
+
+  publish:
+    # 构建成功后，只有标签推送允许写入 GitHub Releases。
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/android-v')
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ needs.build.outputs.artifact }}
+          path: artifacts
+
+      - name: 发布 GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ needs.build.outputs.version }}
+        run: |
+          # 同一个标签重新运行时仅补传产物；不覆盖已经公开发布的 APK。
+          if gh release view "$RELEASE_TAG" > /dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" artifacts/*
+          else
+            gh release create "$RELEASE_TAG" artifacts/* \
+              --verify-tag --title "AirMouse TV $RELEASE_VERSION" --generate-notes
+          fi

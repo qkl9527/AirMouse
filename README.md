@@ -27,3 +27,5 @@ uv run python server.py
 ## Android TV 端
 
 电视端工程位于 `android-tv/`。构建和首次授权步骤见 [Android TV 说明](android-tv/README.md)。
+
+已提供 [Android APK 自动构建与发布流程](android-tv/RELEASING.md)：主分支 Android 相关提交生成 Debug 包，推送 `android-vX.Y.Z` 标签自动发布签名 APK 到 GitHub Releases。
