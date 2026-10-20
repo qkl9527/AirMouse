@@ -2,7 +2,7 @@
 
 ## 1. 当前如何本地打包
 
-Android 工程位于 `android-tv/`，使用仓库自带的 Gradle Wrapper 8.13、Android Gradle Plugin 8.13.2、Kotlin 2.2.20、JDK 17、Android SDK Platform 35。最低安装版本为 Android 7.0 / API 24。
+Android 工程位于 `android-tv/`，使用仓库自带的 Gradle Wrapper 8.14.6（含分发包 SHA-256 校验）、Android Gradle Plugin 8.13.2、Kotlin 2.2.20、JDK 17、Android SDK Platform 35。最低安装版本为 Android 7.0 / API 24。
 
 安装 Android Studio 的 SDK 和 JDK 17 后，在仓库根目录执行：
 
@@ -46,6 +46,13 @@ Workflow：仓库根目录 `.github/workflows/android-apk.yml`，Actions 页面�
 Actions Artifacts 保留 30 天，下载后先解压 ZIP 获取 APK；Releases 中可以直接下载 APK。只修改 `desktop/` 不触发 Android 分支构建。标签推送不受路径过滤限制。
 
 `workflow_dispatch` 手动运行始终生成 Debug 包，正式发布通过推送标签触发。Workflow 首次进入默认分支后，Actions 页面才提供手动运行入口。如果 fork 仓库尚未开启 Actions，需要先在 Actions 页面启用。
+
+### 构建环境和日志提示
+
+- 构建和发布均固定使用 `ubuntu-24.04`，避免 `ubuntu-latest` 自动迁移造成环境变化。
+- 产物上传使用 `actions/upload-artifact@v7`，下载使用 `actions/download-artifact@v8`，均采用 Node 24 运行时。
+- Gradle 固定使用 8.x 的维护版本 8.14.6，保留现有 AGP 8.13.2 和 Kotlin 插件体系。`setup-gradle` 按最新主版本判断支持状态，因此仍可能显示 `Out-of-date Gradle version` 信息提示；这不代表构建失败。迁移 Gradle 9 需要另行评估 Android 与 Kotlin 插件兼容性。
+- `Build Scan not published` 表示没有上传在线构建诊断报告；缓存摘要中的 restored/saved 是下载/保存的缓存数量和大小，都不表示 APK 发布出错。
 
 ## 3. 首次配置正式签名（仅需一次）
 
