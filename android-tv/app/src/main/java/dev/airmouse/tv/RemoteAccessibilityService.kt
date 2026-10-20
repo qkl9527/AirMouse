@@ -10,10 +10,15 @@ import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent
 import android.view.WindowManager
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import android.view.accessibility.AccessibilityWindowInfo
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlin.math.abs
 import kotlin.math.max
 
@@ -31,9 +36,12 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
     private var dragPath: Path? = null
     private var dragStartedAt = 0L
     private var connectedClients = 0
+    private var editorWorker: ExecutorService? = null
+    private val editorKeys = setOf("enter", "backspace", "space", "cursor_left", "cursor_right")
 
     override fun onServiceConnected() {
         super.onServiceConnected()
+        editorWorker = Executors.newSingleThreadExecutor { task -> Thread(task, "airmouse-editor").apply { isDaemon = true } }
         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         overlay = PointerOverlay(this, windowManager)
@@ -50,6 +58,8 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
     override fun onInterrupt() = Unit
 
     override fun onUnbind(intent: android.content.Intent?): Boolean {
+        editorWorker?.shutdownNow()
+        editorWorker = null
         mainHandler.removeCallbacks(hidePointerRunnable)
         ControlServer.stop()
         overlay.hide()
@@ -59,8 +69,28 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
     }
 
     override fun onAction(action: RemoteAction) {
-        // 网络线程只做协议解析；Android View、窗口和手势调用统一切回主线程。
-        mainHandler.post { dispatch(action) }
+        mainHandler.post {
+            if (action is RemoteAction.Text || action is RemoteAction.SceneText ||
+                (action is RemoteAction.Key && action.name in editorKeys)
+            ) {
+                // IME 生命周期在主线程捕获；远程文本查询/无障碍 API 可能等待数秒，
+                // 交给独立串行队列，避免拖住光标绘制、IME 回调和后续输入。
+                val session = RemoteInputBridge.captureSession()
+                editorWorker?.execute {
+                    runCatching { dispatch(action, session) }.onFailure { error ->
+                        Log.w("AirMouseInput", "电视编辑命令执行失败", error)
+                        val requestId = when (action) {
+                            is RemoteAction.Text -> action.requestId
+                            is RemoteAction.Key -> action.requestId
+                            is RemoteAction.SceneText -> action.requestId
+                            else -> null
+                        }
+                        if (requestId != null) ControlServer.notifyActionResult(requestId, false, editorUnavailableMessage)
+                        else reportEditorUnavailable()
+                    }
+                }
+            } else dispatch(action)
+        }
     }
 
     override fun onClientCountChanged(count: Int) {
@@ -75,21 +105,23 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
         mainHandler.post { overlay.updatePartyState(state) }
     }
 
-    private fun dispatch(action: RemoteAction) {
+    private fun dispatch(action: RemoteAction, editor: RemoteEditorSession? = null) {
         when (action) {
             is RemoteAction.Move -> movePointer(action.dx, action.dy)
             is RemoteAction.Click -> click(action.count)
             RemoteAction.DragStart -> startDrag()
             RemoteAction.DragEnd -> finishDrag()
             is RemoteAction.Scroll -> scroll(action.dx, action.dy)
-            is RemoteAction.Key -> handleKey(action.name)
-            is RemoteAction.Text -> {
-                if (!RemoteInputBridge.commitText(action.value)) setFocusedText(action.value)
+            is RemoteAction.Key -> {
+                val result = handleKey(action.name, editor)
+                if (action.requestId != null) ControlServer.notifyActionResult(action.requestId, result,
+                    if (result) "编辑操作已提交到电视。" else editorUnavailableMessage)
             }
+            is RemoteAction.Text -> inputText(action, editor)
             is RemoteAction.EnableAirMouse -> Unit // ControlServer 在网络线程为请求客户端建立 TLS 通道。
             is RemoteAction.ListApps -> Unit // 应用列表由 ControlServer 按请求连接返回。
             is RemoteAction.LaunchApp -> launchApp(action)
-            is RemoteAction.SceneText -> sendSceneText(action)
+            is RemoteAction.SceneText -> sendSceneText(action, editor)
             is RemoteAction.JoinParty,
             is RemoteAction.StartQuiz,
             is RemoteAction.Buzz,
@@ -122,7 +154,7 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
      * 许多视频 App 打开后停在首页；此时宁可提示用户先进入搜索框，也不能把文字
      * 误发到仍在前台的其他页面。
      */
-    private fun sendSceneText(action: RemoteAction.SceneText) {
+    private fun sendSceneText(action: RemoteAction.SceneText, editor: RemoteEditorSession?) {
         val root = rootInActiveWindow
         if (root == null || root.packageName?.toString() != action.packageName) {
             root?.recycle()
@@ -131,7 +163,7 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
         }
         val focusedInput = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
         val editable = focusedInput?.isEditable == true
-        val committed = editable && RemoteInputBridge.commitText(action.value)
+        val committed = editable && editor?.commitText(action.value, TextInputMode.REPLACE) == true
         val filled = if (committed) true else if (editable) {
             focusedInput?.performAction(
                 AccessibilityNodeInfo.ACTION_SET_TEXT,
@@ -211,20 +243,39 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
         )
     }
 
-    private fun handleKey(name: String) {
+    private fun handleKey(name: String, editor: RemoteEditorSession? = null): Boolean {
+        // 文本键只通过捕获的输入会话或无障碍编辑器处理；会话已失效时不能改写新焦点。
+        if (name in editorKeys) {
+            val result = if (editor != null && !editor.isActive) false else when (name) {
+                "backspace" -> editor?.backspace() == true || editFocusedText { it.backspace() }
+                "space" -> editor?.commitText(" ", TextInputMode.INSERT) == true || editFocusedText { it.insert(" ") }
+                "cursor_left", "cursor_right" -> {
+                    val direction = if (name == "cursor_left") -1 else 1
+                    editor?.moveCursor(direction) == true || editFocusedText { it.moveCursor(direction) }
+                }
+                else -> submitEditor(editor)
+            }
+            if (!result) reportEditorUnavailable()
+            return result
+        }
         when (name) {
             "back" -> performGlobalAction(GLOBAL_ACTION_BACK)
             "home" -> performGlobalAction(GLOBAL_ACTION_HOME)
             "up", "down", "left", "right" -> navigate(name)
             "ok" -> activateFocusedNode()
-            "enter" -> if (!RemoteInputBridge.sendEnter()) activateFocusedNode()
-            "backspace" -> if (!RemoteInputBridge.backspace()) editFocusedText { text -> text.dropLast(1) }
-            "space" -> if (!RemoteInputBridge.commitText(" ")) editFocusedText { text -> text + " " }
             "volume_up" -> adjustVolume(AudioManager.ADJUST_RAISE)
             "volume_down" -> adjustVolume(AudioManager.ADJUST_LOWER)
             "mute" -> toggleMute()
             "play_pause" -> togglePlayback()
         }
+        return true
+    }
+
+    private fun submitEditor(editor: RemoteEditorSession?): Boolean {
+        if (editor != null) return editor.sendEnter()
+        // 非 IME 路径只提交输入框声明的输入法动作，不能把“点击当前控件”当成搜索成功。
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return false
+        return withFocusedEditor { it.performAction(AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id) }
     }
 
     private fun navigate(direction: String) {
@@ -304,35 +355,114 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
         if (!activated) click(1)
     }
 
-    private fun setFocusedText(value: String) {
-        val root = rootInActiveWindow ?: return report("电视没有可写入的输入框；请启用并选中 AirMouse 输入法。")
-        val node = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        val result = node?.performAction(
-            AccessibilityNodeInfo.ACTION_SET_TEXT,
-            Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, value) },
-        ) == true
-        node?.recycle()
-        root.recycle()
-        if (!result) report("当前输入框不接受无障碍文字，请启用并选中 AirMouse 输入法。")
+    private fun inputText(action: RemoteAction.Text, editor: RemoteEditorSession?) {
+        val startedAt = SystemClock.uptimeMillis()
+        var route = "ime"
+        val outcome = runCatching {
+            EditorCommandTransaction.execute(action.submit, write = {
+                if (editor != null && !editor.isActive) false
+                // 恢复原来优先输入法的快路径；有活跃会话时不用先查询无障碍树。
+                else editor?.commitText(action.value, action.mode) == true || run {
+                    route = "accessibility"
+                    when (action.mode) {
+                        TextInputMode.REPLACE -> withFocusedEditor { node ->
+                            writeEditorText(node, TextEditState(action.value, action.value.length, action.value.length))
+                        }
+                        TextInputMode.INSERT -> editFocusedText { it.insert(action.value) }
+                    }
+                }
+            }, search = { submitEditor(editor) })
+        }.getOrElse { error ->
+            Log.w("AirMouseInput", "电视文字输入失败 request=${action.requestId}", error)
+            EditorCommandResult(false, false)
+        }
+        val result = outcome.written
+        // 只记录模式、字数和耗时，不把用户输入或目标输入框内容写入日志。
+        Log.i("AirMouseInput", "text request=${action.requestId} route=$route mode=${action.mode} chars=${action.value.length} success=$result applyMs=${SystemClock.uptimeMillis() - startedAt}")
+        val message = when {
+            !result -> editorUnavailableMessage
+            action.submit && !outcome.searched -> "文字输入已提交，但此输入框未接受搜索；请使用电视输入法的搜索键。"
+            else -> "文字输入已提交到电视。"
+        }
+        if (action.requestId != null) ControlServer.notifyActionResult(action.requestId, result, message)
+        else if (!result) report(message)
     }
 
-    private fun editFocusedText(transform: (String) -> String) {
-        val root = rootInActiveWindow ?: return report("电视没有可写入的输入框；请启用并选中 AirMouse 输入法。")
-        val node = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
-        val oldText = node?.text?.toString()
-        val result = oldText != null && node.performAction(
-            AccessibilityNodeInfo.ACTION_SET_TEXT,
-            Bundle().apply {
-                putCharSequence(
-                    AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
-                    transform(oldText),
-                )
-            },
-        )
-        node?.recycle()
-        root.recycle()
-        if (!result) report("当前输入框不支持键盘快捷输入，请启用并选中 AirMouse 输入法。")
+    private val editorUnavailableMessage = "请先选中电视输入框；若仍无法编辑，当前 App 可能未开放文字或光标接口，可改用“AirMouse-手机键盘输入”。"
+
+    private fun reportEditorUnavailable() = report(editorUnavailableMessage)
+
+    private fun withFocusedEditor(action: (AccessibilityNodeInfo) -> Boolean): Boolean {
+        // 当前活动窗口可能是第三方输入法，不能只在 rootInActiveWindow 内找焦点。
+        // 服务级 findFocus 跨窗口查询输入焦点，也省去一次无障碍根节点往返。
+        val focused = findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        if (focused != null) {
+            try {
+                if (focused.isEditable && focused.isEnabled) return action(focused)
+            } finally {
+                focused.recycle()
+            }
+        }
+        // 部分 TV 系统的跨窗口焦点查询不完整，再检查当前应用窗口；排除输入法和覆盖层。
+        val candidates = windows
+        try {
+            for (window in candidates.filter { it.type == AccessibilityWindowInfo.TYPE_APPLICATION && (it.isFocused || it.isActive) }
+                .sortedByDescending { it.isFocused }) {
+                val root = window.root ?: continue
+                val node = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+                try {
+                    if (node?.isEditable == true && node.isEnabled) return action(node)
+                } finally {
+                    node?.recycle()
+                    root.recycle()
+                }
+            }
+            return false
+        } finally {
+            candidates.forEach { it.recycle() }
+        }
     }
+
+    private fun editFocusedText(transform: (TextEditState) -> TextEditState): Boolean = withFocusedEditor { node ->
+        // findFocus 可以命中框架缓存；连续编辑时必须读取当前文字/选区，不能拿上一次的
+        // 内容重写输入框。refresh 绕过节点缓存，可能等待 IPC，因此只在工作队列里调用。
+        if (!node.refresh() || !node.isEditable || !node.isEnabled) return@withFocusedEditor false
+        // 密码节点可能只暴露掩码，不能读出后整段重写；必须使用实际输入法连接编辑。
+        if (node.isPassword) return@withFocusedEditor false
+        val state = TextEditState.from(node.text?.toString().orEmpty(), node.textSelectionStart, node.textSelectionEnd)
+            ?: return@withFocusedEditor false
+        val edited = transform(state)
+        when {
+            edited == state -> true
+            edited.text == state.text -> setEditorSelection(node, edited.start, edited.end)
+            // 先确认此输入框允许定位选区，再更新文本并恢复光标到插入/删除处。
+            !setEditorSelection(node, state.start, state.end) -> false
+            else -> writeEditorText(node, edited)
+        }
+    }
+
+    private fun writeEditorText(node: AccessibilityNodeInfo, state: TextEditState): Boolean {
+        val result = EditorTextWriter.write(state,
+            setText = { text -> node.performAction(
+                AccessibilityNodeInfo.ACTION_SET_TEXT,
+                Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) },
+            ) },
+            setSelection = { start, end -> setEditorSelection(node, start, end) },
+        )
+        if (result == EditorWriteResult.CURSOR_UNAVAILABLE) {
+            // 内容已更新时不能返回“发送失败”，否则重试插入会重复文本。
+            report("文字已更新，但此输入框无法定位光标；请启用并选中“AirMouse-手机键盘输入”。")
+        }
+        return result != EditorWriteResult.FAILED
+    }
+
+    private fun setEditorSelection(node: AccessibilityNodeInfo, start: Int, end: Int): Boolean = node.performAction(
+        AccessibilityNodeInfo.ACTION_SET_SELECTION,
+        Bundle().apply {
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT, start)
+            putInt(AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT, end)
+        },
+    )
 
     private fun adjustVolume(direction: Int) {
         audioManager.adjustStreamVolume(AudioManager.STREAM_MUSIC, direction, AudioManager.FLAG_SHOW_UI)
@@ -378,7 +508,7 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
     }
 
     private fun report(message: String) {
-        TvStatusStore.update { it.copy(message = message) }
+        mainHandler.post { TvStatusStore.update { it.copy(message = message) } }
         ControlServer.notifyControllers(message)
     }
 }

@@ -18,6 +18,9 @@ class Touchpad {
         this.feedback = options.feedback || (() => { });
         this.getMode = options.getMode || (() => 'windows');
         this.getScrollDirection = options.getScrollDirection || (() => 'normal');
+        // 主触摸板页指定上下/左右；其他复用页面未指定时保留原有双轴行为。
+        this.getScrollAxis = options.getScrollAxis || (() => 'both');
+        this.scrollAxis = this.getScrollAxis();
         this.now = options.now || (() => Date.now());
         this.requestFrame = options.requestFrame || (callback => requestAnimationFrame(callback));
         this.cancelFrame = options.cancelFrame || (id => cancelAnimationFrame(id));
@@ -155,10 +158,13 @@ class Touchpad {
             this.ly = cy;
         } else if (this.tCount === 2) {
             const center = this._touchCenter(e.targetTouches);
+            const axis = this.getScrollAxis();
+            if (axis !== this.scrollAxis) this.resetScrollState();
             // 在原始触摸增量处翻转方向，让离手后的惯性也继承同一方向。
             const direction = this.getScrollDirection() === 'reverse' ? -1 : 1;
-            const dx = (center.x - this.lx) * direction;
-            const dy = (center.y - this.ly) * direction;
+            // 先过滤非选中方向，再计算滚轮余量和惯性，避免斜向滑动带入另一轴。
+            const dx = axis === 'vertical' ? 0 : (center.x - this.lx) * direction;
+            const dy = axis === 'horizontal' ? 0 : (center.y - this.ly) * direction;
             this.lastMultiTouchTime = this.now();
             if (this.getMode() === 'mac') {
                 // Mac 模式发送像素级增量，并按触摸速度计算抬手后的惯性。
@@ -265,10 +271,24 @@ class Touchpad {
         this.momentumFrame = null;
     }
 
+    resetScrollState() {
+        // 切换方向立即停止旧惯性，Windows 累计到一半的滚轮余量也不能带到新模式。
+        this._cancelMomentum();
+        this.scrollX = 0;
+        this.scrollY = 0;
+        this.scrollVelocityX = 0;
+        this.scrollVelocityY = 0;
+        this.scrollAxis = this.getScrollAxis();
+    }
+
     _startMomentum() {
         if (Math.hypot(this.scrollVelocityX, this.scrollVelocityY) < 0.015) return;
         let previousAt = this.now();
         const tick = at => {
+            if (this.getScrollAxis() !== this.scrollAxis) {
+                this.resetScrollState();
+                return;
+            }
             const elapsed = Math.min(32, Math.max(1, at - previousAt));
             previousAt = at;
             // Mac 触控板抬手后会继续滑行；约半秒的时间常数保留自然惯性。

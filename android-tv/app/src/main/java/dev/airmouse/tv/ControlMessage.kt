@@ -11,8 +11,8 @@ sealed interface RemoteAction {
     data object DragStart : RemoteAction
     data object DragEnd : RemoteAction
     data class Scroll(val dx: Float, val dy: Float) : RemoteAction
-    data class Key(val name: String) : RemoteAction
-    data class Text(val value: String) : RemoteAction
+    data class Key(val name: String, val requestId: String? = null) : RemoteAction
+    data class Text(val value: String, val mode: TextInputMode = TextInputMode.REPLACE, val requestId: String? = null, val submit: Boolean = false) : RemoteAction
     data class EnableAirMouse(val clientId: String) : RemoteAction
     data class ListApps(val requestId: String) : RemoteAction
     data class LaunchApp(val packageName: String, val requestId: String) : RemoteAction
@@ -25,6 +25,8 @@ sealed interface RemoteAction {
     data class EndParty(val clientId: String) : RemoteAction
     data class CursorStyle(val style: String) : RemoteAction
 }
+
+enum class TextInputMode { REPLACE, INSERT }
 
 /**
  * 手机上的控制页和 TV App 共用的 JSON 协议入口。
@@ -39,6 +41,7 @@ object ControlMessage {
     private val allowedKeys = setOf(
         "back", "home", "up", "down", "left", "right", "ok", "enter", "backspace", "space",
         "volume_up", "volume_down", "mute", "play_pause",
+        "cursor_left", "cursor_right",
     )
 
     fun decode(payload: String): RemoteAction? {
@@ -65,13 +68,23 @@ object ControlMessage {
                     dy = boundedNumber(json, "dy") ?: return null,
                 )
 
-                "key" -> json.optString("name")
-                    .takeIf { it in allowedKeys }
-                    ?.let(RemoteAction::Key)
+                "key" -> {
+                    val name = json.optString("name").takeIf { it in allowedKeys } ?: return null
+                    val requestId = if (json.has("requestId")) validClientId(json.optString("requestId")) ?: return null else null
+                    RemoteAction.Key(name, requestId)
+                }
 
-                "text" -> json.optString("value")
-                    .takeIf { it.length <= MAX_TEXT_CHARS }
-                    ?.let(RemoteAction::Text)
+                "text" -> {
+                    val value = json.optString("value")
+                    // 旧控制页未携带模式时仍采用默认覆盖；未知模式拒绝执行，避免误清空文字。
+                    val mode = when (json.optString("mode", "replace")) {
+                        "replace" -> TextInputMode.REPLACE
+                        "insert" -> TextInputMode.INSERT
+                        else -> return null
+                    }
+                    val requestId = if (json.has("requestId")) validClientId(json.optString("requestId")) ?: return null else null
+                    if (value.length > MAX_TEXT_CHARS) null else RemoteAction.Text(value, mode, requestId, json.optBoolean("submit", false))
+                }
 
                 "enable_air_mouse" -> {
                     val clientId = validClientId(json.optString("clientId")) ?: return null

@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 
-function createTouchpad(mode, scrollDirection = 'normal') {
+function createTouchpad(mode, scrollDirection = 'normal', scrollAxis = 'both') {
     let now = 0;
     let nextFrameId = 1;
     const frames = new Map();
@@ -35,12 +35,13 @@ function createTouchpad(mode, scrollDirection = 'normal') {
     );
     const touchpad = new context.window.TouchpadModule('pad', {
         emit: (name, data) => events.push({ name, data })
-    }, { getMode: () => mode, getScrollDirection: () => scrollDirection, now: () => now });
+    }, { getMode: () => mode, getScrollDirection: () => scrollDirection, getScrollAxis: () => scrollAxis, now: () => now });
 
     const finger = (x, y) => ({ clientX: x, clientY: y });
     return {
         events, frames, clearedTimers, touchpad,
         setTime(value) { now = value; },
+        setScrollAxis(value) { scrollAxis = value; touchpad.resetScrollState(); },
         start(touches) { handlers.touchstart({ targetTouches: touches }); },
         move(touches) { handlers.touchmove({ targetTouches: touches, preventDefault() {} }); },
         end(touches = []) { handlers.touchend({ targetTouches: touches }); },
@@ -213,4 +214,67 @@ test('single-finger movement still emits finite pointer deltas', () => {
     assert.deepEqual(JSON.parse(JSON.stringify(pad.events)), [
         { name: 'move', data: { dx: 8, dy: 20 } }
     ]);
+});
+
+test('vertical Mac scrolling filters horizontal drift', () => {
+    const pad = createTouchpad('mac', 'normal', 'vertical');
+    pad.start([pad.finger(40, 50), pad.finger(60, 50)]);
+    pad.setTime(20);
+    pad.move([pad.finger(70, 70), pad.finger(90, 70)]);
+    assert.deepEqual(JSON.parse(JSON.stringify(pad.events)), [
+        { name: 'scroll', data: { dx: 0, dy: 20, smooth: true } }
+    ]);
+});
+
+test('horizontal Mac scrolling and momentum stay on the horizontal axis', () => {
+    const pad = createTouchpad('mac', 'normal', 'horizontal');
+    pad.start([pad.finger(40, 50), pad.finger(60, 50)]);
+    pad.setTime(20);
+    pad.move([pad.finger(10, 70), pad.finger(30, 70)]);
+    assert.deepEqual(JSON.parse(JSON.stringify(pad.events[0])),
+        { name: 'scroll', data: { dx: -30, dy: 0, smooth: true } });
+    pad.end();
+    pad.flushFrame([...pad.frames.keys()][0], 36);
+    assert.ok(pad.events[1].data.dx < 0);
+    assert.equal(pad.events[1].data.dy, 0);
+});
+
+test('horizontal Windows scrolling keeps wheel steps and reverse preference', () => {
+    const pad = createTouchpad('windows', 'reverse', 'horizontal');
+    pad.start([pad.finger(40, 50), pad.finger(60, 50)]);
+    pad.setTime(20);
+    pad.move([pad.finger(100, 130), pad.finger(120, 130)]);
+    assert.deepEqual(JSON.parse(JSON.stringify(pad.events)), [
+        { name: 'scroll', data: { dx: -2, dy: 0 } }
+    ]);
+});
+
+test('changing axes cancels old Mac momentum', () => {
+    const pad = createTouchpad('mac', 'normal', 'vertical');
+    pad.start([pad.finger(40, 50), pad.finger(60, 50)]);
+    pad.setTime(20);
+    pad.move([pad.finger(40, 70), pad.finger(60, 70)]);
+    pad.end();
+    const pending = [...pad.frames.keys()][0];
+    pad.setScrollAxis('horizontal');
+    pad.flushFrame(pending, 36);
+    assert.equal(pad.events.length, 1);
+    assert.equal(pad.frames.size, 0);
+});
+
+test('changing axes discards Windows wheel remainders', () => {
+    const pad = createTouchpad('windows', 'normal', 'horizontal');
+    pad.start([pad.finger(40, 50), pad.finger(60, 50)]);
+    pad.move([pad.finger(60, 50), pad.finger(80, 50)]);
+    pad.setScrollAxis('vertical');
+    pad.setScrollAxis('horizontal');
+    pad.move([pad.finger(68, 50), pad.finger(88, 50)]);
+    assert.equal(pad.events.length, 0);
+});
+
+test('horizontal mode keeps a two-finger tap as right click', () => {
+    const pad = createTouchpad('windows', 'normal', 'horizontal');
+    pad.start([pad.finger(40, 50), pad.finger(60, 50)]);
+    pad.end();
+    assert.deepEqual(JSON.parse(JSON.stringify(pad.events)), [{ name:'click', data:{ button:'right' } }]);
 });

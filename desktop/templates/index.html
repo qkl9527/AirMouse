@@ -39,6 +39,28 @@
             position: relative;
         }
 
+        .pad-scroll-toggle {
+            position: absolute;
+            top: calc(12px + env(safe-area-inset-top));
+            left: calc(12px + env(safe-area-inset-left));
+            z-index: 2;
+            min-height: 44px;
+            max-width: calc(100% - 24px);
+            padding: 0 14px;
+            border: 1px solid #424242;
+            border-radius: 999px;
+            background: #1a1a1a;
+            color: #fff;
+            font: inherit;
+            font-size: 13px;
+            font-weight: 600;
+            touch-action: manipulation;
+        }
+
+        .pad-scroll-toggle[aria-checked="true"] { background: #fff; border-color: #fff; color: #111; }
+        .pad-scroll-toggle:focus-visible { outline: 2px solid #007AFF; outline-offset: 3px; }
+        #pad-scroll-hint { position: absolute; bottom: 42px; left: 20px; right: 20px; color: #888; font-size: 12px; pointer-events: none; }
+
         /* 顶部/左侧栏：功能开关 */
         .top-nav {
             background: #0f0f0f;
@@ -539,6 +561,9 @@
         </div>
 
         <div id="pad">
+            <button id="pad-scroll-toggle" class="pad-scroll-toggle" type="button" role="switch"
+                aria-label="双指左右滚动" aria-checked="false" aria-describedby="pad-scroll-hint">双指左右：关</button>
+            <div id="pad-scroll-hint">双指上下滚动</div>
             <div
                 style="position:absolute; bottom:20px; left:20px; color:#1a1a1a; font-size:10px; font-weight:bold; letter-spacing: 2px; pointer-events: none;">
                 WEB-AIRMOUSE PRO</div>
@@ -605,7 +630,7 @@
     </div>
 
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
-    <script src="/static/js/touchpad.js?v=2"></script>
+    <script src="/static/js/touchpad.js?v=3"></script>
     <script>
         const socket = io();
 
@@ -807,12 +832,34 @@
             }
         }
 
+        const scrollAxisKey = 'touch_scroll_axis';
+        let horizontalScroll = localStorage.getItem(scrollAxisKey) === 'horizontal';
         const touchpad = new TouchpadModule('pad', socket, {
             getSensitivity: () => sensitivity,
             getMode: () => inputMode,
             getScrollDirection: () => localStorage.getItem('touch_scroll_direction') === 'reverse' ? 'reverse' : 'normal',
+            getScrollAxis: () => horizontalScroll ? 'horizontal' : 'vertical',
             feedback: feedback
         });
+
+        const scrollAxisToggle = document.getElementById('pad-scroll-toggle');
+        function renderScrollAxis() {
+            scrollAxisToggle.setAttribute('aria-checked', String(horizontalScroll));
+            scrollAxisToggle.textContent = `双指左右：${horizontalScroll ? '开' : '关'}`;
+            document.getElementById('pad-scroll-hint').textContent = horizontalScroll ? '双指左右滚动' : '双指上下滚动';
+        }
+        // 控件在触摸板内部，阻止触摸事件进入手势模块，避免切换被识别成鼠标点击或长按拖拽。
+        ['touchstart', 'touchmove', 'touchend', 'touchcancel'].forEach(name => {
+            scrollAxisToggle.addEventListener(name, event => event.stopPropagation(), { passive: true });
+        });
+        scrollAxisToggle.addEventListener('click', event => {
+            event.stopPropagation();
+            horizontalScroll = !horizontalScroll;
+            localStorage.setItem(scrollAxisKey, horizontalScroll ? 'horizontal' : 'vertical');
+            touchpad.resetScrollState();
+            renderScrollAxis();
+        });
+        renderScrollAxis();
 
     </script>
 </body>

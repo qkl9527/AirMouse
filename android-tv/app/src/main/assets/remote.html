@@ -213,6 +213,17 @@
     .sheet { border-color:var(--line); background:#fff; }
     .toast { border-color:#d8d8d4; background:#242424; color:#fff; }
     .hint { color:var(--muted); }
+    .text-mode { display:flex; flex-wrap:wrap; align-items:center; gap:8px 14px; margin:0 0 10px; }
+    .text-mode-group { display:flex; flex:none; gap:8px; }
+    .text-mode-group button { min-width:78px; min-height:44px; }
+    .text-mode-group button[aria-pressed="true"] { border-color:var(--black); background:var(--black); color:#fff; }
+    .text-mode-hint { flex:1 1 180px; margin:0; color:var(--muted); font-size:13px; line-height:1.5; }
+    .text-label { display:block; margin-bottom:7px; font-size:13px; color:var(--muted); }
+    .text-edit-controls { margin-top:20px; padding-top:16px; border-top:1px solid var(--line); }
+    .text-edit-controls .button-row { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-top:8px; }
+    .text-edit-controls button { min-width:0; padding:0 6px; font-size:14px; }
+    .keyboard-send button { min-width:0; padding:0 8px; }
+    .keyboard-send button:disabled { opacity:.55; cursor:wait; }
     @media (max-width:699px) {
       .app { padding-right:16px; padding-left:16px; }
       .topbar { margin:0 -16px; padding:0 16px; }
@@ -241,7 +252,7 @@
     :fullscreen .topbar, :-webkit-full-screen .topbar { margin-right:calc(-1 * clamp(16px,4vw,64px)); margin-left:calc(-1 * clamp(16px,4vw,64px)); padding-right:clamp(16px,4vw,64px); padding-left:clamp(16px,4vw,64px); }
     @media (max-width:420px) { .app { padding-right:12px; padding-left:12px; } .topbar { margin:0 -12px; padding:0 12px; } }
     /* 遥控方式只通过点击切换，触控页内的所有按键始终直接可见。 */
-    .remote-page-track { display:block; overflow:visible; touch-action:pan-y; }
+    .remote-page-track { display:block; width:100%; margin:0; padding:0; overflow:visible; touch-action:pan-y; }
     .remote-page { display:none !important; width:100%; min-width:0; height:auto; flex:none; scroll-snap-align:none; }
     .remote-page.active { display:block !important; }
     .remote-page-touch.active { display:block !important; }
@@ -270,8 +281,11 @@
     .pad-expand-button { position:absolute; z-index:2; top:10px; right:10px; width:44px; min-width:44px; height:44px; min-height:44px; display:grid; place-items:center; padding:0; border:1px solid #ffffff30; border-radius:50%; background:#101719c9; color:#fff; }
     .pad-expand-button svg { width:20px; height:20px; fill:none; stroke:currentColor; stroke-linecap:round; stroke-linejoin:round; stroke-width:1.8; }
     .pad-expand-button .collapse-icon { display:none; }
+    .pad-scroll-toggle { position:absolute; z-index:2; top:10px; left:10px; min-height:44px; max-width:calc(100% - 74px); padding:0 13px; border:1px solid #ffffff30; border-radius:999px; background:#101719c9; color:#fff; font-size:13px; white-space:nowrap; }
+    .pad-scroll-toggle[aria-checked="true"] { background:#fff; border-color:#fff; color:#111; }
     .pad.expanded { position:fixed; z-index:40; inset:0; width:100vw !important; max-width:none; height:100dvh !important; min-height:100dvh; aspect-ratio:auto; margin:0; border:0; border-radius:0; }
     .pad.expanded .pad-expand-button { top:calc(10px + env(safe-area-inset-top)); right:calc(10px + env(safe-area-inset-right)); }
+    .pad.expanded .pad-scroll-toggle { top:calc(10px + env(safe-area-inset-top)); left:calc(10px + env(safe-area-inset-left)); }
     .pad.expanded .pad-expand-button .expand-icon { display:none; }
     .pad.expanded .pad-expand-button .collapse-icon { display:block; }
     .pad.expanded::after { bottom:calc(18px + env(safe-area-inset-bottom)); }
@@ -317,6 +331,7 @@
         <section class="remote-page remote-page-touch active" data-control-page="touch" role="tabpanel" aria-label="触控板遥控">
           <div id="pad" class="pad" aria-label="电视触控板" data-hint="单指移动指针，双指上下滚动">
             <div class="pad-cross"></div>
+            <button id="padScrollToggle" class="pad-scroll-toggle" type="button" role="switch" aria-label="双指左右滚动" aria-checked="false">双指左右：关</button>
             <button id="padExpandButton" class="pad-expand-button" type="button" aria-label="展开触控板" aria-expanded="false" title="展开触控板">
               <svg class="expand-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3H3v5M16 3h5v5M21 16v5h-5M8 21H3v-5"/></svg>
               <svg class="collapse-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3v5H3M16 3h5v5M21 16h-5v5M8 21v-5H3"/></svg>
@@ -342,11 +357,30 @@
         <section class="remote-page" data-control-page="keyboard" role="tabpanel" aria-label="手机键盘输入" hidden>
           <h2 class="view-heading">手机键盘</h2>
           <p class="view-subtitle">先在电视 App 打开搜索框，再输入并发送。</p>
-          <textarea id="textInput" class="text-box" autocomplete="off" autocapitalize="off" placeholder="输入电视搜索内容…"></textarea>
-          <div class="button-row"><button id="sendTextButton" type="button">发送文字</button><button id="searchTextButton" class="accent" type="button">发送并搜索</button></div>
+          <div class="text-mode">
+            <div class="text-mode-group" role="group" aria-label="文字发送方式">
+              <button type="button" data-text-mode="replace" aria-pressed="true">覆盖</button>
+              <button type="button" data-text-mode="insert" aria-pressed="false">插入</button>
+            </div>
+            <p id="textModeHint" class="text-mode-hint" aria-live="polite">发送后替换电视输入框的全部内容。</p>
+          </div>
+          <label class="text-label" for="textInput">发送到电视的文字</label>
+          <textarea id="textInput" class="text-box" maxlength="4096" aria-describedby="textModeHint" autocomplete="off" autocapitalize="off" placeholder="输入电视搜索内容…"></textarea>
+          <div class="button-row keyboard-send"><button id="sendTextButton" type="button">覆盖文字</button><button id="searchTextButton" class="accent" type="button">覆盖并搜索</button></div>
+          <p id="keyboardSendStatus" class="hint" role="status" hidden></p>
+          <button id="keyboardRestoreButton" type="button" hidden>找回未成功的文字</button>
+          <div class="text-edit-controls" role="group" aria-label="编辑电视输入框">
+            <span class="text-label">编辑电视上的文字</span>
+            <div class="button-row">
+              <button type="button" data-key="cursor_left" aria-label="电视文字光标左移">← 光标</button>
+              <button type="button" data-key="backspace" aria-label="删除电视光标前的字符">⌫ 删除</button>
+              <button type="button" data-key="cursor_right" aria-label="电视文字光标右移">光标 →</button>
+            </div>
+            <p class="hint">用左右按钮定位光标，再删除前一个字，或切换“插入”补充文字。</p>
+          </div>
           <div class="shortcuts" id="shortcutSelects"></div>
           <div class="shortcut-buttons" id="shortcutButtons"></div>
-          <p class="hint">快捷键可在下方自定义；输入法需要在电视端启用并选中“AirMouse-手机键盘输入”。</p>
+          <p class="hint">快捷键可在下方自定义。AirMouse 输入法的兼容性最佳；使用其他输入法时，编辑功能取决于电视 App 的支持。</p>
         </section>
         <section class="remote-page" data-control-page="air" role="tabpanel" aria-label="空中飞鼠" hidden>
           <div class="air-stage">
@@ -465,7 +499,7 @@
   if (location.protocol === 'https:' && secureTransfer) {
     try {
       const transferred = JSON.parse(secureTransfer);
-      ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity','airmouse-tv-touch-sensitivity','airmouse-tv-intro-seen','airmouse-tv-show-intro'].forEach(key => {
+      ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity','airmouse-tv-touch-sensitivity','airmouse-tv-pad-horizontal-scroll','airmouse-tv-intro-seen','airmouse-tv-show-intro'].forEach(key => {
         if (typeof transferred[key] === 'string' && transferred[key].length <= 16384) localStorage.setItem(key, transferred[key]);
       });
     } catch (_) { /* 迁移数据损坏时保留 HTTPS 页面现有偏好并继续遥控。 */ }
@@ -489,6 +523,9 @@
   const toastNode = document.getElementById('toast');
   const pad = document.getElementById('pad');
   const padExpandButton = document.getElementById('padExpandButton');
+  const padScrollToggle = document.getElementById('padScrollToggle');
+  const padHorizontalScrollKey = 'airmouse-tv-pad-horizontal-scroll';
+  let padHorizontalScroll = localStorage.getItem(padHorizontalScrollKey) === 'true';
   const padHeightStorageKey = 'airmouse-tv-pad-height-px';
   const savedPadHeight = Number(localStorage.getItem(padHeightStorageKey));
   let customPadHeight = Number.isFinite(savedPadHeight) && savedPadHeight >= 80 && savedPadHeight <= 1600
@@ -532,6 +569,11 @@
   const appRequestId = `apps-${getClientId()}`;
   const pendingLaunches = new Map();
   const pendingSceneSearches = new Map();
+  let textInputMode = 'replace';
+  const pendingKeyboardRequests = new Map();
+  let latestKeyboardRequestId = null;
+  let keyboardProtocol = null;
+  let recoverableKeyboardTexts = [];
 
   function showToast(message) {
     toastNode.textContent = message;
@@ -560,6 +602,8 @@
       send({ type:'cursor_style', style:feedbackPreferences.cursorStyle });
     };
     socket.onclose = () => {
+      cancelKeyboardSend('电视连接已断开，未确认的文字可从手机找回。');
+      keyboardProtocol = null;
       setConnected(false, '电视连接断开，正在重连…');
       partyIdentityReady = false;
       document.getElementById('enableAirButton').disabled = true;
@@ -570,11 +614,22 @@
     socket.onmessage = event => {
       try {
         const message = JSON.parse(event.data);
-        if (message.type === 'status' && message.connected) setConnected(true, '已连接电视');
+        if (message.type === 'status' && message.connected) {
+          setConnected(true, '已连接电视');
+          keyboardProtocol = Number.isInteger(message.keyboardProtocol) ? message.keyboardProtocol : 0;
+          document.querySelectorAll('[data-text-mode="insert"],.text-edit-controls button').forEach(button => { button.disabled = keyboardProtocol < 3; });
+          if (keyboardProtocol < 3) {
+            document.querySelector('[data-text-mode="replace"]').click();
+            setKeyboardStatus('电视控制服务较旧，当前仅支持原有文字发送；请更新电视 App 后使用插入与编辑。');
+          }
+        }
         if (message.type === 'notice' && message.message) showToast(message.message);
         if (message.type === 'secure_ready') showSecureSetup(message);
         if (message.type === 'apps' && message.requestId === appRequestId) renderApps(message.items || []);
         if (message.type === 'action_result') handleActionResult(message);
+        if (message.type === 'text_received' && pendingKeyboardRequests.has(message.requestId) && message.requestId === latestKeyboardRequestId) {
+          setKeyboardStatus('电视已收到文字。');
+        }
         if (message.type === 'party_state') renderParty(message);
         if (message.type === 'party_identity' && message.clientId === getClientId() && typeof message.proof === 'string') {
           clientProof = message.proof;
@@ -736,6 +791,23 @@
     event.stopPropagation();
     setPadExpanded(!pad.classList.contains('expanded'));
   });
+  function renderPadScrollMode() {
+    padScrollToggle.setAttribute('aria-checked', String(padHorizontalScroll));
+    padScrollToggle.textContent = `双指左右：${padHorizontalScroll ? '开' : '关'}`;
+    pad.dataset.hint = `单指移动指针，双指${padHorizontalScroll ? '左右' : '上下'}滚动`;
+  }
+  padScrollToggle.addEventListener('click', event => {
+    event.stopPropagation();
+    // 滚动手势会节流合并，切换方向前丢弃待发送量，避免原轴的残留被发到新轴。
+    if (padScrollTimer !== null) window.clearTimeout(padScrollTimer);
+    padScrollTimer = null;
+    pendingPadScroll = 0;
+    padHorizontalScroll = !padHorizontalScroll;
+    localStorage.setItem(padHorizontalScrollKey, String(padHorizontalScroll));
+    if (pointerState?.scrolling && activePadPointers.size >= 2) pointerState.lastScrollCenter = padPointersCenter();
+    renderPadScrollMode();
+  });
+  renderPadScrollMode();
   document.addEventListener('keydown', event => {
     if (event.key === 'Escape' && pad.classList.contains('expanded')) setPadExpanded(false);
   });
@@ -783,7 +855,7 @@
   document.getElementById('continueSecureButton').addEventListener('click', () => {
     if (!pendingSecureUrl) { showToast('请先准备电视安全连接'); return; }
     // HTTPS 与 HTTP 的 localStorage 相互隔离；用 fragment 单向迁移设置，避免把片名附到请求地址。
-    const keys = ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity','airmouse-tv-touch-sensitivity','airmouse-tv-intro-seen','airmouse-tv-show-intro'];
+    const keys = ['airmouse-tv-scenes','airmouse-tv-shortcuts','airmouse-tv-feedback','airmouse-tv-gyro-sensitivity','airmouse-tv-touch-sensitivity','airmouse-tv-pad-horizontal-scroll','airmouse-tv-intro-seen','airmouse-tv-show-intro'];
     const transfer = Object.fromEntries(keys.map(key => [key, localStorage.getItem(key)]).filter(([, value]) => value !== null));
     const secureUrl = new URL(pendingSecureUrl);
     let fragment = new URLSearchParams({ 'airmouse-transfer':JSON.stringify(transfer) }).toString();
@@ -799,20 +871,23 @@
     window.location.assign(secureUrl.toString());
   });
 
-  function padPointersCenterY() {
+  function padPointersCenter() {
     const positions = [...activePadPointers.values()];
-    return positions.reduce((sum, point) => sum + point.y, 0) / positions.length;
+    return {
+      x:positions.reduce((sum, point) => sum + point.x, 0) / positions.length,
+      y:positions.reduce((sum, point) => sum + point.y, 0) / positions.length,
+    };
   }
   function flushPadScroll() {
     padScrollTimer = null;
-    const dy = Math.max(-800, Math.min(800, pendingPadScroll));
+    const delta = Math.max(-800, Math.min(800, pendingPadScroll));
     pendingPadScroll = 0;
-    if (!dy) return;
+    if (!delta) return;
     lastPadScrollSentAt = performance.now();
-    send({ type:'scroll', dx:0, dy });
+    send({ type:'scroll', dx:padHorizontalScroll ? delta : 0, dy:padHorizontalScroll ? 0 : delta });
   }
-  function queuePadScroll(deltaY) {
-    pendingPadScroll += deltaY * touchSensitivity;
+  function queuePadScroll(delta) {
+    pendingPadScroll += delta * touchSensitivity;
     if (Math.abs(pendingPadScroll) < 12 || padScrollTimer !== null) return;
     // Android 的无障碍滑动手势约持续 260ms；节流并合并移动量，避免连续手势互相取消。
     const wait = Math.max(0, 260 - (performance.now() - lastPadScrollSentAt));
@@ -820,8 +895,8 @@
   }
   pad.addEventListener('pointerdown', event => {
     if (activeMode !== 'touch') return;
-    // 展开/收起按钮位于触控板内部；跳过指针转发，避免按 UI 被电视识别成点击。
-    if (event.target.closest('#padExpandButton')) return;
+    // 方向开关与展开按钮都在触控板内部，操作它们不向电视发送点击或移动。
+    if (event.target.closest('button')) return;
     event.preventDefault();
     pad.setPointerCapture(event.pointerId);
     activePadPointers.set(event.pointerId, { x:event.clientX, y:event.clientY });
@@ -835,7 +910,7 @@
       if (!pointerState.scrolling && dragMode) send({ type:'drag_end' });
       pointerState.scrolling = true;
       pointerState.moved = true;
-      pointerState.lastScrollCenterY = padPointersCenterY();
+      pointerState.lastScrollCenter = padPointersCenter();
     }
   });
   pad.addEventListener('pointermove', event => {
@@ -845,10 +920,12 @@
     activePadPointers.set(event.pointerId, { x:event.clientX, y:event.clientY });
     if (pointerState.scrolling) {
       if (activePadPointers.size < 2) return;
-      const centerY = padPointersCenterY();
-      const deltaY = centerY - pointerState.lastScrollCenterY;
-      pointerState.lastScrollCenterY = centerY;
-      if (Math.abs(deltaY) > 0.1) queuePadScroll(deltaY);
+      const center = padPointersCenter();
+      const previousCenter = pointerState.lastScrollCenter;
+      pointerState.lastScrollCenter = center;
+      // 只取开关选中的轴；横向滑动时的上下抖动（或反之）不会造成斜向滚动。
+      const delta = padHorizontalScroll ? center.x - previousCenter.x : center.y - previousCenter.y;
+      if (Math.abs(delta) > 0.1) queuePadScroll(delta);
       return;
     }
     if (event.pointerId !== pointerState.id) return;
@@ -881,7 +958,10 @@
 
   document.getElementById('clickButton').addEventListener('click', () => send({ type:'click', count:1 }));
   document.getElementById('doubleButton').addEventListener('click', () => send({ type:'click', count:2 }));
-  document.querySelectorAll('[data-key]').forEach(button => button.addEventListener('click', () => send({ type:'key', name:button.dataset.key })));
+  document.querySelectorAll('[data-key]').forEach(button => button.addEventListener('click', () => {
+    if (button.closest('.text-edit-controls')) sendEditorKey(button.dataset.key);
+    else send({ type:'key', name:button.dataset.key });
+  }));
 
   function getClientId() {
     let id = new URLSearchParams(location.search).get('clientId') || localStorage.getItem('airmouse-tv-client-id');
@@ -965,6 +1045,20 @@
   }
 
   function handleActionResult(message) {
+    const keyboardRequest = pendingKeyboardRequests.get(message.requestId);
+    if (keyboardRequest) {
+      pendingKeyboardRequests.delete(message.requestId);
+      if (!message.success) {
+        if (keyboardRequest.value) recoverKeyboardText(keyboardRequest.value);
+        const messageText = message.message || '电视未接受文字，请先选中输入框。';
+        setKeyboardStatus(messageText);
+        showToast(messageText);
+        return;
+      }
+      // 回执只更新状态；输入与搜索已在电视端有序执行，不再依赖手机补发回车。
+      if (message.requestId === latestKeyboardRequestId) setKeyboardStatus(message.message || '输入操作已提交到电视。');
+      return;
+    }
     const pendingSearch = pendingSceneSearches.get(message.requestId);
     if (pendingSearch) {
       clearTimeout(pendingSearch.timer);
@@ -1162,14 +1256,85 @@
     shortcutButtons.appendChild(button);
   }
 
+  document.querySelectorAll('[data-text-mode]').forEach(button => button.addEventListener('click', () => {
+    textInputMode = button.dataset.textMode;
+    document.querySelectorAll('[data-text-mode]').forEach(item => item.setAttribute('aria-pressed', String(item === button)));
+    const insert = textInputMode === 'insert';
+    document.getElementById('textModeHint').textContent = insert
+      ? '在电视当前光标处插入；选中文字时仅替换选中部分。'
+      : '发送后替换电视输入框的全部内容。';
+    document.getElementById('sendTextButton').textContent = insert ? '插入文字' : '覆盖文字';
+    document.getElementById('searchTextButton').textContent = insert ? '插入并搜索' : '覆盖并搜索';
+  }));
+
+  function setKeyboardStatus(message) {
+    const status = document.getElementById('keyboardSendStatus');
+    status.textContent = message;
+    status.hidden = !message;
+  }
+
+  function cancelKeyboardSend(message) {
+    if (!pendingKeyboardRequests.size) return;
+    pendingKeyboardRequests.forEach(request => { if (request.value) recoverKeyboardText(request.value); });
+    pendingKeyboardRequests.clear();
+    setKeyboardStatus(message);
+    showToast(message);
+  }
+
+  function recoverKeyboardText(value) {
+    const input = document.getElementById('textInput');
+    if (!input.value) { input.value = value; return; }
+    if (input.value === value) return;
+    recoverableKeyboardTexts.push(value);
+    document.getElementById('keyboardRestoreButton').hidden = false;
+  }
+  document.getElementById('keyboardRestoreButton').addEventListener('click', () => {
+    const input = document.getElementById('textInput');
+    // 保留用户后来输入的草稿，把未成功的文字追加到末尾供用户整理。
+    input.value = [input.value, ...recoverableKeyboardTexts].filter(Boolean).join('\n');
+    recoverableKeyboardTexts = [];
+    document.getElementById('keyboardRestoreButton').hidden = true;
+    setKeyboardStatus('未成功的文字已追加到手机草稿，可修改后重发。');
+    input.focus();
+  });
+
+  function rememberKeyboardRequest(requestId, request) {
+    // 回执可延迟，按请求号分别跟踪；只限制本地记录数，不因计时器把慢操作判为失败。
+    if (pendingKeyboardRequests.size >= 32) pendingKeyboardRequests.delete(pendingKeyboardRequests.keys().next().value);
+    pendingKeyboardRequests.set(requestId, request);
+    latestKeyboardRequestId = requestId;
+  }
+
+  function sendEditorKey(name) {
+    if (keyboardProtocol === null) { showToast('正在确认电视连接，请稍候。'); return; }
+    if (keyboardProtocol < 3) { showToast('请先更新电视 App，再使用文字编辑。'); return; }
+    const requestId = `edit-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    if (send({ type:'key', name, requestId })) {
+      rememberKeyboardRequest(requestId, { kind:'edit' });
+      setKeyboardStatus(name === 'backspace' ? '退格操作已发送到电视。' : '光标移动已发送到电视。');
+    }
+  }
+
   function sendText(withEnter) {
+    if (keyboardProtocol === null) { showToast('正在确认电视连接，请稍候。'); return; }
     const input = document.getElementById('textInput');
     const value = input.value;
     if (!value.trim()) { showToast('先输入要发送的文字'); input.focus(); return; }
-    if (send({ type:'text', value })) {
-      if (withEnter) send({ type:'key', name:'enter' });
-      input.value = '';
-      input.blur();
+    if (value.length > 4096) { showToast('文字过长，请拆分后发送，每次最多 4096 个字符。'); return; }
+    if (keyboardProtocol < 3) {
+      // 与旧版服务保留原来的一发一回车行为，不能等待它根本没有实现的结果回执。
+      if (send({ type:'text', value })) {
+        if (withEnter) send({ type:'key', name:'enter' });
+        input.value = ''; input.blur();
+        setKeyboardStatus('文字已发送；旧版电视服务不提供结果回执。');
+      }
+      return;
+    }
+    const requestId = `text-${Date.now()}-${Math.random().toString(36).slice(2,8)}`;
+    if (send({ type:'text', value, mode:textInputMode, requestId, submit:withEnter })) {
+      rememberKeyboardRequest(requestId, { kind:'text', value });
+      input.value = ''; input.blur();
+      setKeyboardStatus('文字已发送到电视。');
     }
   }
   document.getElementById('sendTextButton').addEventListener('click', () => sendText(false));

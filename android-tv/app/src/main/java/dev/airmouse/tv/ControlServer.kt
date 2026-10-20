@@ -269,7 +269,7 @@ object ControlServer {
                     countedAsClient = true
                     writeWebSocketUpgrade(output, webSocketAccept)
             if (!activateClient(socket, output, generation)) return
-                    writeTextFrame(output, "{\"type\":\"status\",\"connected\":true}")
+                    writeTextFrame(output, "{\"type\":\"status\",\"connected\":true,\"keyboardProtocol\":3}")
                     readWebSocketMessages(socket, input, output)
                 }
 
@@ -476,6 +476,18 @@ object ControlServer {
                     val message = payload.toString(StandardCharsets.UTF_8)
                     when (val action = ControlMessage.decode(message)) {
                         is RemoteAction.ListApps -> writeTextFrame(output, listAppsMessage(action.requestId))
+
+                        is RemoteAction.Text -> {
+                            // 网络接收与系统输入完成是两个阶段。先向发起手机确认收件，
+                            // 即使系统无障碍接口响应慢，也不会让用户对着无反馈的按钮等待。
+                            action.requestId?.let { requestId ->
+                                writeTextFrame(output, JSONObject()
+                                    .put("type", "text_received")
+                                    .put("requestId", requestId)
+                                    .toString())
+                            }
+                            runCatching { listener?.onAction(action) }
+                        }
 
                         is RemoteAction.JoinParty -> {
                             joinParty(socket, output, action)

@@ -57,8 +57,11 @@ if _IS_MAC:
     _quartz.CGEventCreateMouseEvent.restype = _CFTypeRef
     _quartz.CGEventCreateMouseEvent.argtypes = [_CFTypeRef, ctypes.c_uint32, _CGPoint, ctypes.c_uint32]
     _quartz.CGEventCreateScrollWheelEvent.restype = _CFTypeRef
+    # 原型为 (source, units, wheelCount, wheel1, ...)，只有前四项是固定参数。
+    # wheel2（横向位移）必须按可变参数传递：Apple Silicon 的两种调用约定不同，
+    # 如果把 wheel2 也写进 argtypes，它会进入错误的参数位置，造成横向滚动失效。
     _quartz.CGEventCreateScrollWheelEvent.argtypes = [
-        _CFTypeRef, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_int32, ctypes.c_int32,
+        _CFTypeRef, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_int32,
     ]
     _quartz.CGEventPost.restype = None
     _quartz.CGEventPost.argtypes = [ctypes.c_uint32, _CFTypeRef]
@@ -118,7 +121,7 @@ if _IS_MAC:
     def _post_scroll(dy, dx=0):
         # Quartz orders scroll deltas as vertical (wheel1), then horizontal (wheel2).
         ev = _quartz.CGEventCreateScrollWheelEvent(
-            None, _kCGScrollUnitPixel, 2, int(dy), int(dx)
+            None, _kCGScrollUnitPixel, 2, int(dy), ctypes.c_int32(int(dx))
         )
         if not ev:
             debug_log('quartz', 'scroll_event_create_failed', dx=dx, dy=dy)
