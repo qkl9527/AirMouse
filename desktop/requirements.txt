@@ -6,3 +6,4 @@ pynput
 pyopenssl
 pystray
 pillow
+qrcode>=8.2

@@ -414,6 +414,13 @@
             }
         }
     </style>
+    {% if embedded %}
+    <style>
+        /* 同一连接页嵌入主页弹窗时只展示扫码内容，避免重复导航与标题。 */
+        .topbar, .footer-note { display: none; }
+        .page { padding: 16px; }
+    </style>
+    {% endif %}
 </head>
 <body>
     <main class="page">
@@ -444,7 +451,7 @@
 
                 <div class="recommended-body">
                     <div class="qr-shell">
-                        <div class="qr-target" data-url="{{ recommended.url }}" data-size="512"></div>
+                        <div class="qr-target"><img src="{{ recommended.qr_image }}" alt="扫码连接 {{ recommended.url }}" width="512" height="512"></div>
                     </div>
 
                     <div>
@@ -469,7 +476,7 @@
                     {% for target in alternatives %}
                     <article class="alternative-card">
                         <div class="mini-qr">
-                            <div class="qr-target" data-url="{{ target.url }}" data-size="256"></div>
+                            <div class="qr-target"><img src="{{ target.qr_image }}" alt="扫码连接 {{ target.url }}" width="256" height="256"></div>
                         </div>
                         <div class="alternative-kind">{{ target.kind }}</div>
                         <div class="alternative-name" title="{{ target.interface }}">{{ target.interface }}</div>
@@ -493,36 +500,5 @@
 
         <p class="footer-note">AirMouse Remote Server</p>
     </main>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-    <script>
-        (() => {
-            const targets = document.querySelectorAll('.qr-target');
-
-            function showError(element) {
-                element.innerHTML = '<div class="qr-error">二维码库加载失败，请刷新页面或直接打开下方地址</div>';
-            }
-
-            if (typeof QRCode === 'undefined') {
-                targets.forEach(showError);
-                return;
-            }
-
-            targets.forEach((element) => {
-                const size = Number(element.dataset.size) || 256;
-                try {
-                    new QRCode(element, {
-                        text: element.dataset.url,
-                        width: size,
-                        height: size,
-                        colorDark: '#0b0d0c',
-                        colorLight: '#ffffff',
-                        correctLevel: QRCode.CorrectLevel.M
-                    });
-                } catch (error) {
-                    showError(element);
-                }
-            });
-        })();
-    </script>
 </body>
 </html>

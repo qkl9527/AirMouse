@@ -18,7 +18,8 @@ if platform.system() == 'Darwin':
     except ImportError:
         pass
 
-from web_app import app, socketio, get_all_ip_addresses
+from web_app import app, socketio, get_connection_targets
+from connection_qr import print_terminal_qr
 from app_paths import app_dir, is_frozen, resource_path
 from debug_logging import debug_socket_event
 import mouse_service
@@ -462,12 +463,15 @@ def _check_mac_permissions():
 
 def main():
     use_tray = os.environ.get('AIRMOUSE_NO_TRAY') != '1'
-    hide_console = os.environ.get('AIRMOUSE_SHOW_CONSOLE') != '1'
+    # 手动从终端运行时保留窗口，才能看到启动二维码；打包版仍默认隐藏控制台。
+    hide_console = is_frozen() and os.environ.get('AIRMOUSE_SHOW_CONSOLE') != '1'
     http_mode = os.environ.get('AIRMOUSE_HTTP') == '1'
-    scheme = 'http' if http_mode else 'https'
 
     if hide_console:
         hide_console_window()
+
+    # 控制台与托盘启动使用同一份连接信息，二维码绝不使用 127.0.0.1。
+    print_connection_info(http_mode=http_mode)
 
     if use_tray:
         if _tray_available():
@@ -482,10 +486,17 @@ def main():
 
     _check_mac_permissions()
 
-    ips = get_all_ip_addresses()
+    start_server(http_mode=http_mode)
 
+
+def print_connection_info(http_mode=False):
+    """终端二维码与网页按同一规则优先选择 Wi-Fi / 有线网卡。"""
+    if sys.stdout is None:
+        return
+    scheme = 'http' if http_mode else 'https'
+    targets = get_connection_targets(PORT, http_mode=http_mode)
     print("\n" + "═"*60)
-    print("🚀 Remote Pro Server 已启动！" + ("  [HTTP 模式]" if http_mode else ""))
+    print("🚀 正在启动 AirMouse" + ("  [HTTP 模式]" if http_mode else ""))
     print(f"🏠 当前系统: {platform.system()}")
     print("📱 请在浏览器访问以下地址:")
     print(f"🖥️  本机主页: {scheme}://127.0.0.1:{PORT}/")
@@ -493,15 +504,19 @@ def main():
     if http_mode:
         print("💡 当前为 HTTP 模式，陀螺仪（gyro）功能不可用。", flush=True)
 
-    for interface, ip in ips:
-        tag = ""
-        if any(keyword in interface.lower() for keyword in ["wlan", "wi-fi", "eth", "en0", "en1"]):
-            tag = " [推荐]"
-        print(f"  ➤  {scheme}://{ip}:{PORT}{tag}")
+    for index, target in enumerate(targets):
+        tag = " [推荐]" if index == 0 else ""
+        print(f"  ➤  {target['url']}  ({target['interface']}){tag}")
+
+    if targets:
+        print("\n📷 手机扫码连接（请与电脑连接同一局域网）：")
+        print_terminal_qr(targets[0]['url'])
+        print(f"   {targets[0]['url']}")
+    else:
+        print("未检测到局域网地址，请连接 Wi-Fi 或网线后在主页打开扫码弹窗。")
 
     print("═"*60 + "\n")
 
-    start_server(http_mode=http_mode)
 
 
 if __name__ == '__main__':

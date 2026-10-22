@@ -193,6 +193,35 @@
             background: rgba(34, 34, 48, 0.95);
         }
 
+        .qr-entry { cursor: pointer; font-family: inherit; }
+        .connection-dialog {
+            width: min(940px, calc(100% - 24px));
+            height: min(850px, 90vh);
+            height: min(850px, 90dvh);
+            max-width: none;
+            max-height: none;
+            padding: 0;
+            border: 1px solid #30382f;
+            border-radius: 20px;
+            background: #0b0d0c;
+            color: #fff;
+            box-shadow: 0 24px 90px #0009;
+        }
+        .connection-dialog[open] { display: flex; flex-direction: column; }
+        .connection-dialog::backdrop { background: #000b; }
+        .connection-dialog-head { display: flex; align-items: center; gap: 16px; padding: 16px 20px; }
+        .connection-dialog-head h2 { font-size: 18px; margin: 0; flex: 1; }
+        .connection-dialog-head a { color: #59e391; font-size: 12px; }
+        .connection-dialog-head button {
+            min-height: 44px; padding: 0 14px; border: 1px solid #3a423c;
+            border-radius: 10px; color: #fff; background: #1b211e; cursor: pointer;
+        }
+        .connection-dialog iframe { flex: 1; min-height: 0; width: 100%; border: 0; }
+        @media (max-width: 480px) {
+            .connection-dialog-head { gap: 10px; padding: 12px; }
+            .connection-dialog-head h2 { font-size: 16px; }
+        }
+
         .qr-entry-icon {
             width: 18px;
             height: 18px;
@@ -224,11 +253,19 @@
         }
     </style>
 </head>
-<body onclick="initAudio()">
-    <a class="qr-entry" href="/connect" onclick="v()">
+<body onclick="if (typeof initAudio === 'function') initAudio()">
+    <button type="button" class="qr-entry" id="connection-open" aria-haspopup="dialog" aria-controls="connection-dialog">
         <span class="qr-entry-icon" aria-hidden="true"></span>
         <span>扫码连接</span>
-    </a>
+    </button>
+    <dialog class="connection-dialog" id="connection-dialog" aria-labelledby="connection-title">
+        <div class="connection-dialog-head">
+            <h2 id="connection-title">手机扫码连接</h2>
+            <a href="/connect" target="_blank" rel="noopener">单独打开</a>
+            <button type="button" id="connection-close" autofocus>关闭</button>
+        </div>
+        <iframe id="connection-frame" title="电脑局域网连接二维码"></iframe>
+    </dialog>
     <div class="container">
         <div class="header">
             <div class="logo" role="img" aria-label="AirMouse"></div>
@@ -300,9 +337,36 @@
         </div>
     </div>
 
+    <script>
+        // 扫码弹窗独立于 Socket.IO 初始化；局域网断外网时也能打开。
+        (() => {
+            const dialog = document.getElementById('connection-dialog');
+            const frame = document.getElementById('connection-frame');
+            document.getElementById('connection-open').onclick = () => {
+                if (typeof dialog.showModal !== 'function') {
+                    window.location.href = '/connect';
+                    return;
+                }
+                // 每次重新读取网卡地址，支持启动后从有线网络切到 Wi-Fi。
+                frame.src = '/connect?embed=1';
+                dialog.showModal();
+            };
+            document.getElementById('connection-close').onclick = () => dialog.close();
+            frame.onload = () => {
+                // iframe 内的键盘事件不会冒泡到主页，单独转交 Escape 关闭操作。
+                frame.contentDocument?.addEventListener('keydown', event => {
+                    if (event.key === 'Escape') { event.preventDefault(); dialog.close(); }
+                });
+            };
+            dialog.addEventListener('click', event => {
+                const rect = dialog.getBoundingClientRect();
+                if (event.target === dialog && (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom)) dialog.close();
+            });
+        })();
+    </script>
     <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
     <script>
-        const socket = io();
+        const socket = typeof io === 'function' ? io() : null;
         let audioCtx = null;
         function initAudio() {
             if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();

@@ -4,6 +4,7 @@ import psutil
 from flask import Flask, render_template, request
 from flask_socketio import SocketIO
 from app_paths import resource_path
+from connection_qr import qr_image_data
 
 app = Flask(
     __name__,
@@ -103,7 +104,7 @@ def get_connection_targets(port, http_mode=False):
         targets.append({
             "interface": interface,
             "ip": ip,
-            "kind": get_interface_kind(interface, ip, outbound_ip, stats),
+            "kind": get_interface_kind(interface),
             "url": url,
             "score": get_interface_score(interface, ip, outbound_ip, stats),
         })
@@ -122,11 +123,15 @@ def connect_page():
     # 若请求是 http:// 进来的则 http_mode=True
     http_mode = request.environ.get('wsgi.url_scheme') == 'http'
     targets = get_connection_targets(port, http_mode=http_mode)
+    # 在电脑上编码成图片，页面不再依赖外部 JS 或二维码服务。
+    for target in targets:
+        target['qr_image'] = qr_image_data(target['url'])
     return render_template(
         'connect.html',
         recommended=targets[0] if targets else None,
         alternatives=targets[1:] if len(targets) > 1 else [],
         target_count=len(targets),
+        embedded=request.args.get('embed') == '1',
     )
 
 @app.route('/healthz')

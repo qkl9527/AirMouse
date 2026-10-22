@@ -12,6 +12,7 @@ dependencies = [
     "pyopenssl",
     "pystray",
     "pillow",
+    "qrcode>=8.2",
 ]
 
 [project.optional-dependencies]
@@ -29,7 +30,7 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["."]
 only-include = ["server.py", "web_app.py", "mouse_service.py", "keyboard_service.py",
-                "gamepad_service.py", "config_manager.py", "app_paths.py",
+                "gamepad_service.py", "config_manager.py", "app_paths.py", "connection_qr.py",
                 "templates", "static", "*.pem", "*.json"]
 
 [tool.uv]
