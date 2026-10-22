@@ -1573,7 +1573,9 @@
   const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'agent-phone.css' + location.search; document.head.append(css);
   const renderer = document.createElement('script'); renderer.src = 'agent-conversation.js' + location.search;
   renderer.onload = () => {
-    const script = document.createElement('script'); script.src = 'agent-phone.js' + location.search; document.body.append(script);
+    const settings = document.createElement('script'); settings.src = 'agent-provider-ui.js' + location.search;
+    settings.onload = () => { const script = document.createElement('script'); script.src = 'agent-phone.js' + location.search; document.body.append(script); };
+    document.body.append(settings);
   };
   document.body.append(renderer);
 })();

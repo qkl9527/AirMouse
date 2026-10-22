@@ -65,7 +65,7 @@
           let item=nodes[index];
           if(!item){
             const article=document.createElement('article');article.className=options.messageClass+' '+message.role;
-            const label=document.createElement(options.roleTag || 'div');label.className=options.roleClass || '';label.textContent=message.kind==='operation'?'AIR MOUSE / 操作结果':message.role==='user'?options.userLabel:'AGNES / 回答';
+            const label=document.createElement(options.roleTag || 'div');label.className=options.roleClass || '';label.textContent=message.kind==='operation'?'AIR MOUSE / 操作结果':message.role==='user'?options.userLabel:(options.assistantLabel || '助手 / 回答');
             const copy=document.createElement(options.copyTag || 'div');copy.className=options.copyClass || '';
             article.append(label,copy);
             if(message.image && message.image.startsWith('data:image/jpeg;base64,')){

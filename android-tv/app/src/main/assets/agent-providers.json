@@ -1,0 +1,222 @@
+[
+  {
+    "id": "agnes",
+    "name": "Agnes AI · 国际",
+    "group": "国际",
+    "baseUrl": "https://apihub.agnes-ai.com/v1",
+    "protocol": "chat",
+    "family": "agnes",
+    "docs": "https://agnes-ai.com/en/docs/agnes-30-flash",
+    "note": "保留原 Agnes 接入。备用域名不自动切换。"
+  },
+  {
+    "id": "openai",
+    "name": "OpenAI",
+    "group": "国际",
+    "baseUrl": "https://api.openai.com/v1",
+    "protocol": "responses",
+    "family": "openai",
+    "docs": "https://developers.openai.com/api/docs/guides/function-calling",
+    "note": "默认 Responses；也可选 Chat Completions。"
+  },
+  {
+    "id": "anthropic",
+    "name": "Anthropic",
+    "group": "国际",
+    "baseUrl": "https://api.anthropic.com/v1",
+    "protocol": "anthropic",
+    "family": "generic",
+    "docs": "https://platform.claude.com/docs/en/api/messages",
+    "note": "使用 Messages 协议；思考能力按实际模型配置。"
+  },
+  {
+    "id": "gemini",
+    "name": "Google Gemini",
+    "group": "国际",
+    "baseUrl": "https://generativelanguage.googleapis.com/v1beta/openai",
+    "protocol": "chat",
+    "family": "generic",
+    "docs": "https://ai.google.dev/gemini-api/docs/openai",
+    "note": "使用 Gemini 的 OpenAI 兼容接口。"
+  },
+  {
+    "id": "qwen-intl",
+    "name": "阿里云百炼 · 新加坡",
+    "group": "国际",
+    "baseUrl": "https://dashscope-intl.aliyuncs.com/compatible-mode/v1",
+    "protocol": "chat",
+    "family": "qwen",
+    "docs": "https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope",
+    "note": "国际地域需使用对应地域 Key，不自动复用中国站 Key。"
+  },
+  {
+    "id": "minimax",
+    "name": "MiniMax · 国际",
+    "group": "国际",
+    "baseUrl": "https://api.minimax.io/v1",
+    "protocol": "chat",
+    "family": "generic",
+    "docs": "https://platform.minimax.io/docs/api-reference/text-openai-api",
+    "note": "按账户地域和套餐使用相应服务地址。"
+  },
+  {
+    "id": "xai",
+    "name": "xAI / Grok",
+    "group": "国际",
+    "baseUrl": "https://api.x.ai/v1",
+    "protocol": "chat",
+    "family": "generic",
+    "docs": "https://docs.x.ai/developers/model-capabilities/legacy/chat-completions",
+    "note": "默认 Chat Completions 兼容接口，思考档位以所选模型支持为准。"
+  },
+  {
+    "id": "mistral",
+    "name": "Mistral AI",
+    "group": "国际",
+    "baseUrl": "https://api.mistral.ai/v1",
+    "protocol": "chat",
+    "family": "generic",
+    "docs": "https://docs.mistral.ai/api/endpoint/chat",
+    "note": "选择聊天模型；工具和视觉能力需按模型确认。"
+  },
+  {
+    "id": "deepseek",
+    "name": "DeepSeek",
+    "group": "国内",
+    "baseUrl": "https://api.deepseek.com",
+    "protocol": "chat",
+    "family": "deepseek",
+    "docs": "https://api-docs.deepseek.com/",
+    "note": "读取模型列表或填写完整模型 ID。"
+  },
+  {
+    "id": "qwen-cn",
+    "name": "阿里云百炼 · 北京",
+    "group": "国内",
+    "baseUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "protocol": "chat",
+    "family": "qwen",
+    "docs": "https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope",
+    "note": "可改为业务空间专属域名；Key 必须与地域一致。"
+  },
+  {
+    "id": "ark",
+    "name": "火山方舟 / 豆包",
+    "group": "国内",
+    "baseUrl": "https://ark.cn-beijing.volces.com/api/v3",
+    "protocol": "chat",
+    "family": "generic",
+    "docs": "https://www.volcengine.com/docs/82379",
+    "note": "可手动填写模型 ID 或控制台推理接入点 ID。"
+  },
+  {
+    "id": "kimi",
+    "name": "月之暗面 Kimi",
+    "group": "国内",
+    "baseUrl": "https://api.moonshot.cn/v1",
+    "protocol": "chat",
+    "family": "thinking",
+    "docs": "https://platform.kimi.com/docs/api/chat",
+    "note": "支持聊天、视觉和工具的能力以所选模型为准。"
+  },
+  {
+    "id": "glm",
+    "name": "智谱 GLM",
+    "group": "国内",
+    "baseUrl": "https://open.bigmodel.cn/api/paas/v4",
+    "protocol": "chat",
+    "family": "thinking",
+    "docs": "https://docs.bigmodel.cn/cn/guide/develop/openai/introduction",
+    "note": "普通 API 地址；Coding Plan 请按套餐文档修改地址。"
+  },
+  {
+    "id": "minimax-cn",
+    "name": "MiniMax · 国内",
+    "group": "国内",
+    "baseUrl": "https://api.minimax.cn/v1",
+    "protocol": "chat",
+    "family": "generic",
+    "docs": "https://platform.minimax.cn/docs/api-reference/text-openai-api",
+    "note": "中国站 Key 与国际站分开保存；按账户套餐使用相应地址。"
+  },
+  {
+    "id": "qianfan",
+    "name": "百度千帆",
+    "group": "国内",
+    "baseUrl": "https://qianfan.baidubce.com/v2",
+    "protocol": "chat",
+    "family": "generic",
+    "docs": "https://cloud.baidu.com/doc/qianfan-docs/s/Fm9l6ocai",
+    "note": "使用千帆 v2 API Key，选择支持聊天的模型。"
+  },
+  {
+    "id": "hunyuan",
+    "name": "腾讯混元",
+    "group": "国内",
+    "baseUrl": "https://api.hunyuan.cloud.tencent.com/v1",
+    "protocol": "chat",
+    "family": "generic",
+    "docs": "https://cloud.tencent.com/document/product/1729/111007",
+    "note": "适用于原混元 API Key；新开通的 TokenHub 账户请按其控制台修改地址。"
+  },
+  {
+    "id": "siliconflow",
+    "name": "硅基流动",
+    "group": "聚合平台",
+    "baseUrl": "https://api.siliconflow.cn/v1",
+    "protocol": "chat",
+    "family": "qwen",
+    "docs": "https://docs.siliconflow.cn/docs/userguide/quickstart",
+    "note": "模型 ID 保留组织名前缀；不同模型能力不同。"
+  },
+  {
+    "id": "openrouter",
+    "name": "OpenRouter",
+    "group": "聚合平台",
+    "baseUrl": "https://openrouter.ai/api/v1",
+    "protocol": "chat",
+    "family": "openrouter",
+    "docs": "https://openrouter.ai/docs/api/reference/overview",
+    "note": "模型 ID 含提供商前缀，模型列表可返回上下文及能力。"
+  },
+  {
+    "id": "together",
+    "name": "Together AI",
+    "group": "聚合平台",
+    "baseUrl": "https://api.together.ai/v1",
+    "protocol": "chat",
+    "family": "generic",
+    "docs": "https://docs.together.ai/docs/inference/openai-compatibility",
+    "note": "读取账户模型列表，或手动填写完整模型 ID。"
+  },
+  {
+    "id": "groq",
+    "name": "Groq",
+    "group": "聚合平台",
+    "baseUrl": "https://api.groq.com/openai/v1",
+    "protocol": "chat",
+    "family": "generic",
+    "docs": "https://console.groq.com/docs/openai",
+    "note": "使用 Groq 的 OpenAI 兼容接口。"
+  },
+  {
+    "id": "fireworks",
+    "name": "Fireworks AI",
+    "group": "聚合平台",
+    "baseUrl": "https://api.fireworks.ai/inference/v1",
+    "protocol": "chat",
+    "family": "generic",
+    "docs": "https://docs.fireworks.ai/tools-sdks/openai-compatibility",
+    "note": "可手动填写 accounts/…/models/… 模型 ID。"
+  },
+  {
+    "id": "custom",
+    "name": "自定义服务",
+    "group": "自定义",
+    "baseUrl": "",
+    "protocol": "chat",
+    "family": "generic",
+    "docs": "",
+    "note": "填写 HTTPS baseURL 或完整 endpoint，支持免认证服务。"
+  }
+]

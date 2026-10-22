@@ -16,7 +16,7 @@
 
 ## 工具调用过程
 
-1. 请求携带固定的 OpenAI 兼容 `tools` / `tool_choice`。支持普通和 SSE 响应里的 `tool_calls`；流式参数收齐之前不执行。
+1. 按提供商协议转换工具定义与结果，支持 Chat Completions、Responses、Anthropic Messages 的普通及 SSE 响应。只有启用工具能力的模型才发送工具定义；流式参数收齐并完整结束之前不执行。
 2. 服务端验证工具名、类型、参数范围、应用白名单和场景 ID，生成实际执行计划。
 3. 电视无障碍浮层提示操作；手机弹窗列出完整计划。只有发起该轮对话、完成配对的手机可以允许 / 拒绝。其他手机只可查看。
 4. 确认绑定随机 ID、对话代次和两分钟有效期，重复点击不会重复执行。模型不能替用户批准。
@@ -26,23 +26,79 @@
 
 每轮最多 8 个工具调用、最多 6 次模型请求，避免无限循环。操作结果记录在两端对话中。`submitted` 只表示命令提交，不宣称影片已经播放或界面结果已验证。
 
-## 模型与显示配置
+## 提供商与模型
 
-配置以 TV 为准，手机每次连接后同步；保存成功才生效。
+手机进入 **Agent → 模型设置**：
 
-| 配置 | 默认 | 范围 / 说明 |
+1. 在“添加提供商”中选择平台，默认填入地址、协议和参数格式。已有 Agnes 配置、Key 和模型参数会自动迁移。
+2. 填写该平台的 API Key。点击 **保存并读取模型列表**，搜索、选择模型并添加；也可 **手动添加**，填写平台要求的完整模型 ID 或推理接入点 ID。
+3. 确认模型的上下文窗口、最大输出、思考强度、图片和工具能力，点击 **保存并设为当前模型**。一个提供商下可配置多个模型，共用此提供商的 Key。
+4. 切换旧模型时，在对应提供商中选择模型，再设为当前。正在回答、压缩或等待审批时，先停止或等完成后再保存。
+
+宽屏使用左侧提供商列表和右侧编辑区；手机使用顶部提供商选择器，模型参数按需展开。共用显示设置中保留流式开关和电视字号。
+
+### 内置接入预设
+
+以下预设根据官方文档填写，可修改地址。预设只提供接入入口，不承诺账号能调用列表里的每个模型。新模型不依赖 APK 更新：从接口读取或手动填写即可。
+
+| 提供商（官方文档） | 分类 | 默认协议 |
 | --- | --- | --- |
-| 模型 | Agnes 3.0 Flash | 固定 `agnes-3.0-flash` |
-| 上下文窗口 | 32768 Token | 4096–512000；保守预算达到 80% 时压缩旧历史；保留 system、当前问题和本轮完整工具过程 |
-| 最大输出 | 2048 Token | 128–65536，且至少为输入预留 1024；发送为 `max_tokens` |
-| 思考强度 | 关闭 | 关闭 / 低 / 中 / 高；开启传 `reasoning_effort=low/medium/high`，并启用 Agnes `chat_template_kwargs.enable_thinking` |
+| [Agnes AI · 国际](https://agnes-ai.com/en/docs/agnes-30-flash) | 国际 | Chat Completions |
+| [OpenAI](https://developers.openai.com/api/docs/guides/function-calling) | 国际 | Responses |
+| [Anthropic](https://platform.claude.com/docs/en/api/messages) | 国际 | Messages |
+| [Google Gemini](https://ai.google.dev/gemini-api/docs/openai) | 国际 | Chat Completions |
+| [阿里云百炼 · 新加坡](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope) | 国际 | Chat Completions |
+| [MiniMax · 国际](https://platform.minimax.io/docs/api-reference/text-openai-api) | 国际 | Chat Completions |
+| [xAI / Grok](https://docs.x.ai/developers/model-capabilities/legacy/chat-completions) | 国际 | Chat Completions |
+| [Mistral AI](https://docs.mistral.ai/api/endpoint/chat) | 国际 | Chat Completions |
+| [DeepSeek](https://api-docs.deepseek.com/) | 国内 | Chat Completions |
+| [阿里云百炼 · 北京](https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope) | 国内 | Chat Completions |
+| [火山方舟 / 豆包](https://www.volcengine.com/docs/82379) | 国内 | Chat Completions |
+| [月之暗面 Kimi](https://platform.kimi.com/docs/api/chat) | 国内 | Chat Completions |
+| [智谱 GLM](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) | 国内 | Chat Completions |
+| [MiniMax · 国内](https://platform.minimax.cn/docs/api-reference/text-openai-api) | 国内 | Chat Completions |
+| [百度千帆](https://cloud.baidu.com/doc/qianfan-docs/s/Fm9l6ocai) | 国内 | Chat Completions |
+| [腾讯混元](https://cloud.tencent.com/document/product/1729/111007) | 国内 | Chat Completions |
+| [硅基流动](https://docs.siliconflow.cn/docs/userguide/quickstart) | 聚合平台 | Chat Completions |
+| [OpenRouter](https://openrouter.ai/docs/api/reference/overview) | 聚合平台 | Chat Completions |
+| [Together AI](https://docs.together.ai/docs/inference/openai-compatibility) | 聚合平台 | Chat Completions |
+| [Groq](https://console.groq.com/docs/openai) | 聚合平台 | Chat Completions |
+| [Fireworks AI](https://docs.fireworks.ai/tools-sdks/openai-compatibility) | 聚合平台 | Chat Completions |
+
+另提供 **自定义服务**，支持上述三种协议、HTTPS baseURL 或完整 endpoint，以及 API Key / 无需认证两种方式。保存时自动规范化末尾路径。不能把某个平台的 Chat 接口仅通过切换协议就变成 Responses / Messages，地址和协议必须与实际服务匹配。
+
+接口模型列表不一定包含全部可用模型，也可能包含非聊天模型；列表接口不可用时可手动添加。OpenRouter 等接口提供的上下文和能力会用于初始填写；未提供的能力需要按模型文档确认。读取最多 1000 项（Anthropic 最多 10 页）。不同地域、普通 API 与 Coding Plan 的地址和 Key 可能不同，需按控制台配置，不自动换线路或跨提供商尝试 Key。
+
+### 模型与显示参数
+
+配置以 TV 为准，手机每次连接后同步；保存成功才生效。当前模型由所有已配对手机共享。
+
+| 配置 | 新模型默认 | 范围 / 说明 |
+| --- | --- | --- |
+| 模型 ID | 手动填写或读取 | 不固定模型版本；原 Agnes 模型保留 |
+| 上下文窗口 | 32768 Token，接口提供时自动填写 | 4096–2000000；保守预算达到 80% 时压缩旧历史 |
+| 最大输出 | 2048 Token，接口提供时参考其上限 | 128–262144，至少为输入预留 1024；读入值最高先取 8192，可再改 |
+| 思考强度 | 提供商默认 | 默认不传参数；其余档位按协议 / 参数格式转换，须模型支持 |
+| 工具调用 | 开启，接口提供能力时优先使用 | 不支持工具的模型请关闭；所有实际电视操作仍须逐次确认 |
+| 图片输入 | 关闭，接口提供能力时优先使用 | 只有勾选后才可发送新图片；仍需选支持视觉的模型 |
+| 输出参数名 | 自动 | Chat 可选择 `max_tokens` / `max_completion_tokens`；Responses 用 `max_output_tokens`，Messages 用 `max_tokens` |
+| 扩展 JSON | `{}` | 高级采样 / 思考参数；须为对象，最多 8192 字符，不允许覆盖消息、工具、认证和模型 |
 | 流式输出 | 开启 | 下一个问题生效，电视持久化 |
-| 电视文字大小 | 28 | 12–48 CSS px；立即同步到电视阅读页，手机字号不变 |
-| API Key | 未设置 | Android Keystore + AES-GCM 加密保存；不回传、不写日志，无明文回退；留空保存其他参数时保留原 Key |
+| 电视文字大小 | 28 | 12–48 CSS px，立即同步到电视 |
+| API Key | 未设置 | 最多 4096 个可打印英文字符；同一提供商留空沿用，支持明确移除 |
 
-上下文窗口是本地预算，不会改变模型固有的窗口，也不是精确的服务商 tokenizer 计数。文字按 UTF-8 字节保守估算，图片预留 8192 Token，同时计算工具定义、最大输出及安全余量。达到 80% 时，用同一个模型分块总结历史目标、事实、操作参数、确认状态和结果；摘要请求不携带工具。最新用户问题与本轮工具链保留原样。只有压缩后低于 80% 且至少减少约 10% 预算才继续，否则提示新开会话，原记录保留。摘要模型调用也消耗额度。读取完整回复与 SSE 都有容量保护。
+**思考参数：** OpenAI 使用 [reasoning 参数](https://developers.openai.com/api/docs/guides/reasoning)；Anthropic 非默认强度使用 [adaptive thinking / effort](https://platform.claude.com/docs/en/build-with-claude/effort)，旧模型可选默认并在扩展 JSON 配置 `thinking.budget_tokens`；OpenRouter 使用 [reasoning 配置](https://openrouter.ai/docs/guides/best-practices/reasoning-tokens)。千问等适配 `enable_thinking`，Kimi / GLM 适配 `thinking.type`。不是所有模型都支持关闭思考或全部强度，不确定时选择“提供商默认”。扩展 JSON 中同名字段覆盖表单生成值。
 
-[Agnes 官方文档](https://agnes-ai.com/en/docs/agnes-30-flash) 明确列出工具调用及 `enable_thinking`。思考档位按 [OpenAI reasoning_effort 规范](https://developers.openai.com/api/docs/guides/reasoning)传入，Agnes 未明确承诺所有档位；若接口拒绝，页面提示关闭思考或调整参数，不静默回退。
+协议适配保留本轮工具续答所需的 Responses reasoning 项、Anthropic 思考签名及 Chat 原始 assistant 字段；这些内容不进入展示历史。兼容接口返回在开头的 `<think>` 内容也不展示，原始内容仅用于本轮续答。拒绝工具后禁用本轮后续调用，不依赖模型自行遵守。
+
+上下文窗口是本地预算，不会改变模型固有的窗口，也不是精确的服务商 tokenizer 计数。文字按 UTF-8 字节保守估算，图片预留 8192 Token，同时计算工具定义、最大输出及安全余量。达到 80% 时，用同一个模型分块总结历史目标、事实、操作参数、确认状态和结果；摘要请求不携带工具。最新用户问题与本轮工具链保留原样。只有压缩后低于 80% 且至少减少约 10% 预算才继续，否则提示新开会话，原记录保留。摘要调用也消耗额度。切换模型会继续携带当前会话历史；若新模型不支持历史图片，需切回视觉模型或另开会话。
+
+### 保存与同步
+
+- 提供商、各自 Key、模型和当前选择整体以 Android Keystore + AES-GCM 加密，原子写入电视私有目录，无明文回退；手机同步数据只包含 `hasKey`，不含 Key 原文。
+- 地址或协议变更时，留空 Key 不会自动带到新接口：需要重新填写，或明确勾选沿用已保存 Key。网络不跟随重定向，也不把上游原始错误体回显到手机。
+- 使用版本号防止另一部手机的旧草稿覆盖最新配置。关闭配置面板会丢弃未保存草稿；没有自动保存 Key 的浏览器存储。
+- 最多 24 个提供商、每个 100 个模型，配置总量最多 256K 字符。删除当前提供商或禁用当前模型后，需手动选择可用模型，不会自动换平台。
 
 ## 会话
 
@@ -60,7 +116,7 @@
 ## 当前限制
 
 - Agent 无法读取电视截图或自动识别搜索入口；搜索场景要求目标 App 已提供搜索焦点。
-- 普通 HTTP 配对时，手机到电视的配置和聊天仍经局域网传输；电视到 Agnes 使用 HTTPS。
+- 普通 HTTP 配对时，手机到电视的配置和聊天仍经局域网传输；电视到所选模型提供商使用 HTTPS。
 - Key 仍独立加密保存。普通会话（文字、图片、操作记录、摘要）保存在 TV 应用私有目录，应用已禁用系统备份；一次性对话不写入历史存储。卸载或清除应用数据会移除历史。
 - 指针和播放 / 暂停按系统接口派发，无法保证第三方应用接受。多步场景可能部分完成，失败不会回滚已完成步骤。
 - 此版本按要求只编译交付；真实模型调用、思考档位、电视弹窗和确认执行由用户在设备上测试。

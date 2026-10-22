@@ -42,6 +42,7 @@ import javax.net.ssl.SSLSocket
  * 其他网页利用浏览器跨站发起控制连接的机会。服务只绑定本地网络，不开放云端中继。
  */
 object ControlServer {
+    private val modelListing = java.util.concurrent.atomic.AtomicBoolean(false)
     private const val DEFAULT_PORT = 8765
     private const val DEFAULT_HTTPS_PORT = 8766
     private const val MAX_HEADER_BYTES = 8192
@@ -240,7 +241,7 @@ object ControlServer {
             }
 
             when (uri.rawPath ?: "/") {
-                "/agent-phone.css", "/agent-phone.js", "/agent-conversation.js" -> {
+                "/agent-phone.css", "/agent-phone.js", "/agent-conversation.js", "/agent-provider-ui.js" -> {
                     val name = uri.rawPath.removePrefix("/")
                     val body = applicationContext?.assets?.open(name)?.use { it.readBytes() } ?: return
                     val type = if (name.endsWith(".css")) "text/css" else "application/javascript"
@@ -601,8 +602,32 @@ object ControlServer {
     private fun handleAgentMessage(json: JSONObject, output: DataOutputStream, socket: Socket) {
         val id = json.optString("requestId")
         if (!id.matches(Regex("[A-Za-z0-9_-]{1,96}"))) return
+        if(json.optString("type")=="agent_provider_models") {
+            // 读取模型列表可能较慢，不能占住遥控 WebSocket 接收循环。
+            if(!modelListing.compareAndSet(false,true)) {
+                writeTextFrame(output,JSONObject().put("type","agent_result").put("requestId",id).put("ok",false).put("message","正在读取模型列表，请稍候。").toString())
+                return
+            }
+            val serverVersion=serverGeneration
+            Thread({
+                try {
+                    val result=runCatching {AgentModelClient.models(AgentSession.modelsRoute(json.optString("providerId")))}
+                    val response=JSONObject().put("type","agent_result").put("requestId",id).put("ok",result.isSuccess)
+                    result.onSuccess {response.put("data",it)}.onFailure {response.put("message",if(it is AgentModelClient.Failure)it.message else "读取模型列表失败，请检查地址与网络，或手动添加模型。")}
+                    if(serverVersion==serverGeneration)runCatching {writeTextFrame(output,response.toString())}
+                } finally {modelListing.set(false)}
+            },"airmouse-agent-models").start()
+            return
+        }
+        if(json.optString("type") in setOf("agent_provider_save","agent_provider_delete","agent_provider_activate")) {
+            val result=AgentSession.updateProvider(json.optString("type"),json)
+                .put("type","agent_result").put("requestId",id)
+            writeTextFrame(output,result.toString())
+            writeTextFrame(output,AgentSession.snapshot().toString())
+            return
+        }
         val error = when (json.optString("type")) {
-            "agent_configure" -> AgentSession.configure(json)
+            "agent_configure" -> "模型配置已升级为多提供商，请刷新手机网页后配置。"
             "agent_text_size" -> {
                 val value=json.opt("value")
                 if(value !is Number || value.toDouble()!=value.toInt().toDouble()) "字号必须为整数。"
@@ -641,8 +666,9 @@ object ControlServer {
             "agent_latest" -> { AgentSession.scrollToLatestAnswer(); null }
             else -> "未知 Agent 操作，请更新电视 App。"
         }
-        writeTextFrame(output, JSONObject().put("type", "agent_result").put("requestId", id)
-            .put("ok", error == null).put("message", error ?: "已收到").toString())
+        val result=JSONObject().put("type", "agent_result").put("requestId", id)
+            .put("ok", error == null).put("message", error ?: "已收到")
+        writeTextFrame(output,result.toString())
         writeTextFrame(output, AgentSession.snapshot().toString())
     }
 

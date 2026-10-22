@@ -1,0 +1,39 @@
+AirMouse Agent 与完整功能宣传图
+日期：2026-10-22
+生成方式：内置 image_gen。
+视觉方向：暖色家居、暖白与木色、品牌紫；与既有宣传素材保持一致。
+产物：
+- airmouse-agent-landscape.png：Agent 专题，手机发指令、大屏看回答、确认后执行。
+- airmouse-full-features-landscape.png：完整功能总览，电视遥控、客厅 Agent、电脑操控。
+宣传图中的家居场景、电视阅读页与对话卡片为生成示意；真实界面以 gallery 下原始截图和应用为准。
+能力依据：用户本轮说明、android-tv/AGENT.md、android-tv/README.md 与实际截图。
+保留原有宣传图，README 改用本次完整功能图，并在 Agent 章节加入专题图。
+
+Agent 专题提示词：
+Use case: ads-marketing.
+Make ONE polished landscape 16:9 high resolution Chinese promotional poster for "AirMouse Agent", a phone-browser conversational assistant for controlling Android TV and TV boxes. Aim 2560x1440 landscape.
+Reference 1: existing AirMouse lifestyle poster, STYLE/BRAND only. Match warm ivory, oak, cozy sunlight, charcoal text, tasteful vivid purple brand accents and purple rounded-square white mouse icon. Reference 2: actual AirMouse phone Agent page, use its real black-and-white visual identity and recognisable "客厅 Agent" heading, "模型设置" button, "在电视打开" action, white chat surface and five-item bottom navigation with Agent selected. Reference 3: actual expanded input area showing typed chat and "发送" and image buttons. Preserve these traits. No browser chrome, IP addresses, or provider model name as a marketing endorsement.
+
+Art direction: sophisticated, calm editorial home-technology advertising. A true horizontal canvas, very readable Chinese text. Left 45 percent cream editorial area with top brand and big headline; lower left a compact capability list. Right 55 percent warm photographic living room, soft neutral sofa, an adult's natural hands typing on one large foreground phone showing the actual AirMouse Agent white webpage, television in background displaying a beautifully readable AI answer page (not a movie or hallucinated visual tracking). On TV a clean white reading page with heading "客厅 Agent" and line "让答案在电视上展开". The phone screen is recognisable as reference 2, with bottom composer from reference 3. Keep phone realistic and uncluttered. One subtle violet arc visually links phone and TV. No robots, neon grids or sci-fi holograms.
+
+Overlay a single tasteful editorial demonstration card near the phone, clearly labeled "对话示意". It should show a human chat bubble "把音量调低", a response "待确认：音量 −", and small buttons "允许" and "拒绝". This is a waiting-for-confirmation demo, NOT already executed. Avoid inventing success claims, voice input, or autonomous screen recognition. No microphone or speaking human motifs.
+
+Exact main copy:
+Small brand "AirMouse Agent"
+Big headline on two lines: "聊一聊，" / "也能操作电视。"
+Subtitle: "手机发指令 · 大屏看回答 · 确认后执行"
+A refined 7-item capability list with small minimal icons, organized in two aligned columns, short labels:
+"遥控按键"  "文字输入"
+"打开已安装应用"  "运行已存场景"
+"指针操作"  "光标样式"
+"抢答与投票"
+Each item only these words, no giant boxes or dense explanations.
+Bottom footer, unobtrusive but readable:
+"手机浏览器使用 · 需配置模型服务 · 同一局域网连接"
+"不读取电视画面，不自动识别按钮"
+and small "Android TV / Google TV"
+Important factual constraints: user enters text to chat; model actions require explicit phone confirmation. Only launch genuinely installed apps and saved scenes. Pointer coordinates can be directed but AI has no screen vision or automatic button discovery. User may supply images to compatible models, but TV screenshot acquisition does not exist. No promises of universal compatibility, free model service, internet remote access, voice assistant, automatic visual search, or remote power-on.
+Beautiful photography, exact and crisp Chinese typography, careful alignments, generous whitespace. Produce one complete professional poster.
+
+完整功能提示词：
+undefined

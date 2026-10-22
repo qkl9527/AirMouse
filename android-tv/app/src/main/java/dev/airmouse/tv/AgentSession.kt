@@ -4,7 +4,6 @@ import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.HttpURLConnection
-import java.net.URL
 import java.util.concurrent.Executors
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.TimeUnit
@@ -15,11 +14,11 @@ import java.util.UUID
  * 网络工作与遥控接收线程隔离；代次令牌使取消、清空、停服后的旧回复无法污染新会话。
  */
 object AgentSession {
-    const val MODEL = "agnes-3.0-flash"
     private val lock = Any()
     private val worker = Executors.newSingleThreadExecutor()
     private var apiKey = ""
     private var configuration = AgentConfiguration.Value()
+    private var providerStore: AgentProviderStore? = null
     private var appContext: Context? = null
     private var messages = JSONArray()
     private var historyStore: AgentHistoryStore? = null
@@ -59,7 +58,9 @@ object AgentSession {
                 messages = session.messages
                 contextEstimate=0; contextNotice=""; storageWarning=""
             }
-            configuration = AgentConfiguration.load(context)
+            val legacy=AgentConfiguration.load(context)
+            if(providerStore==null) providerStore=AgentProviderStore(context,legacy)
+            configuration=providerStore!!.current(legacy.textSize)
             apiKey = configuration.key
             streaming = context.getSharedPreferences("agent-preferences", Context.MODE_PRIVATE)
                 .getBoolean("streaming", true)
@@ -75,14 +76,15 @@ object AgentSession {
     }
 
     fun snapshot(): JSONObject = synchronized(lock) {
-        JSONObject().put("type", "agent_state").put("model", MODEL)
-            .put("configured", apiKey.isNotEmpty()).put("busy", busy).put("error", error)
+        JSONObject().put("type", "agent_state").put("model", configuration.modelId).put("providerName",configuration.providerName)
+            .put("configured", configuration.modelId.isNotEmpty() && (configuration.auth=="none" || apiKey.isNotEmpty())).put("busy", busy).put("error", error)
             .put("tvVisible", visible).put("revision", revision)
             .put("latestAnswerRequest", latestAnswerRequest)
             .put("streaming", streaming)
             .put("responseStreaming", responseStreaming)
             .put("approval", approval?.json() ?: JSONObject.NULL)
             .put("configuration", AgentConfiguration.publicJson(configuration))
+            .put("providerSettings",providerStore?.publicState() ?: JSONObject())
             .put("session", session.metadata()).put("sessions", historyStore?.list() ?: JSONArray())
             .put("compacting", compacting).put("contextNotice", contextNotice)
             .put("contextEstimate", contextEstimate).put("storageWarning", storageWarning)
@@ -148,30 +150,22 @@ object AgentSession {
         changed()
     }
 
-    /** 返回可向当前连接展示的校验错误；发送前已在服务端检查配对令牌和 Origin。 */
-    fun configure(json: JSONObject): String? {
-        synchronized(lock) {
-            if (busy) return "请先停止当前回答，再修改模型配置。"
-            val key = json.optString("apiKey").trim().ifEmpty { apiKey }
-            if (key.length !in 1..512 || key.any { it.code !in 33..126 }) return "请填写有效的 Agnes API Key（最多 512 字符）。"
-            fun integer(name: String, fallback: Int): Int? {
-                if (!json.has(name)) return fallback
-                val value=json.opt(name)
-                return (value as? Number)?.toInt()?.takeIf { it.toDouble()==value.toDouble() }
-            }
-            val contextTokens=integer("contextTokens",configuration.contextTokens) ?: return "上下文窗口必须为整数。"
-            val maxTokens=integer("maxTokens",configuration.maxTokens) ?: return "最大输出 Token 必须为整数。"
-            val textSize=integer("textSize",configuration.textSize) ?: return "电视字号必须为整数。"
-            val effort=json.optString("effort",configuration.effort)
-            if(contextTokens !in 4096..512000 || maxTokens !in 128..65536 || maxTokens > contextTokens-1024) return "上下文须为 4096–512000，输出须为 128–65536，并至少为输入保留 1024 Token。"
-            if(effort !in setOf("off","low","medium","high") || textSize !in 12..48) return "思考强度或电视字号无效。"
-            val next=AgentConfiguration.Value(key,contextTokens,maxTokens,effort,textSize)
-            val context=appContext ?: return "电视服务尚未启动。"
-            if(runCatching { AgentConfiguration.save(context,next) }.isFailure) return "电视无法加密保存配置，请检查系统 Keystore；没有退回明文保存。"
-            configuration=next; apiKey=key; error=""
+    /** 配置修改只发生在空闲状态；一轮回答和压缩始终使用同一个提供商。 */
+    fun updateProvider(type:String,json:JSONObject):JSONObject {
+        fun rejected(message:String)=JSONObject().put("ok",false).put("message",message)
+        val result=synchronized(lock) {
+            if(busy)return rejected("请先停止当前回答或等待操作完成，再修改提供商。")
+            val store=providerStore ?: return rejected("电视服务尚未启动。")
+            val failure=store.mutate(type,json)
+            if(failure!=null)return rejected(failure)
+            configuration=store.current(configuration.textSize);apiKey=configuration.key;error=""
+            // 回执与本次修改在同一把锁内取快照，避免夹入另一手机的保存版本。
+            JSONObject().put("ok",true).put("message","已保存").put("providerSettings",store.publicState())
         }
-        changed()
-        return null
+        changed();return result
+    }
+    fun modelsRoute(id:String):AgentConfiguration.Value = synchronized(lock) {
+        checkNotNull(providerStore).forModels(id)
     }
 
     fun setTextSize(value: Int): String? {
@@ -179,7 +173,7 @@ object AgentSession {
             if(value !in 12..48) return "电视文字大小须为 12–48。"
             val context=appContext ?: return "电视服务尚未启动。"
             val next=configuration.copy(textSize=value)
-            if(runCatching { AgentConfiguration.save(context,next) }.isFailure) return "电视无法保存字号。"
+            if(runCatching { AgentConfiguration.saveTextSize(context,value) }.isFailure) return "电视无法保存字号。"
             configuration=next
         }
         changed()
@@ -188,13 +182,12 @@ object AgentSession {
 
     fun forgetConfigurationKey(): String? {
         synchronized(lock) {
-            val context=appContext ?: return "电视服务尚未启动。"
-            val next=configuration.copy(key="")
-            if(runCatching { AgentConfiguration.save(context,next) }.isFailure) return "电视未能移除已保存的 Key。"
-            configuration=next
+            if(busy)return "请先停止当前回答，再移除 Key。"
+            val store=providerStore ?: return "电视服务尚未启动。"
+            store.forgetKey()?.let {return it}
+            configuration=store.current(configuration.textSize);apiKey=configuration.key
         }
-        cancel(forgetKey=true)
-        return null
+        changed();return null
     }
 
     /** 只允许发起手机处理当前审批。ID、代次、时效和一次性状态全部在电视端判定。 */
@@ -251,7 +244,8 @@ object AgentSession {
         synchronized(lock) {
             if(sessionId != session.id) return "当前会话已切换，请同步后确认内容再发送。"
             if (id in receivedIds || (0 until messages.length()).any { messages.getJSONObject(it).optString("id")==id }) return null
-            if (apiKey.isEmpty()) return "先在模型设置中填写 Agnes API Key。"
+            if (configuration.modelId.isEmpty() || (configuration.auth!="none" && apiKey.isEmpty())) return "请在模型设置中配置提供商，并选择一个已启用模型。"
+            if(image.isNotEmpty() && !configuration.visionEnabled) return "当前模型未启用图片能力，请在模型设置中确认支持图片或切换模型。"
             if (busy) return "正在回答，请等待或先停止。"
             if (messages.length() >= 400 || messages.toString().length + image.length > 4_000_000) {
                 return "此会话的展示记录已达到容量上限，请新开会话；历史仍可查看。"
@@ -310,7 +304,7 @@ object AgentSession {
         }.getOrDefault(false)
     }
 
-    private data class ModelReply(val text: String, val calls: JSONArray = JSONArray())
+    private data class ModelReply(val text: String, val calls: JSONArray = JSONArray(), val native: JSONArray? = null, val chatMessage: JSONObject? = null)
 
     private fun buildChat(history: JSONArray, context: JSONObject): JSONArray {
         val chat = JSONArray().put(JSONObject().put("role", "system").put("content",
@@ -330,7 +324,7 @@ object AgentSession {
 
     private fun runTurn(id: String, key: String, history: JSONArray, job: Long, useStream: Boolean, owner: String, context: JSONObject) {
         var chat = buildChat(history, context)
-        var toolsAllowed = true
+        var toolsAllowed = synchronized(lock) {configuration.toolsEnabled}
         var callsUsed = 0
         for (round in 0..5) {
             synchronized(lock) { if (job != generation) throw AgentFailure("已停止") }
@@ -359,7 +353,9 @@ object AgentSession {
                 return
             }
             // 先把完整、合法的 assistant tool_calls 写入上下文，再为每个调用补上对应 tool 结果。
-            chat.put(JSONObject().put("role", "assistant").put("content", reply.text.ifEmpty { null } ?: JSONObject.NULL).put("tool_calls", reply.calls))
+            val assistant=reply.chatMessage?.let {JSONObject(it.toString())} ?: JSONObject().put("role", "assistant").put("content", reply.text.ifEmpty { null } ?: JSONObject.NULL).put("tool_calls", reply.calls)
+            reply.native?.let {assistant.put("_native",it)}
+            chat.put(assistant)
             for (index in 0 until reply.calls.length()) {
                 val call = reply.calls.getJSONObject(index)
                 var recorded = false
@@ -470,7 +466,7 @@ object AgentSession {
     }
     private fun estimateChat(chat: JSONArray) = (0 until chat.length()).sumOf { estimate(chat.getJSONObject(it)) }
     private fun requestEstimate(chat: JSONArray, config: AgentConfiguration.Value, withTools: Boolean = true) =
-        estimateChat(chat)+config.maxTokens+512+if(withTools) AgentTools.definitions().toString().toByteArray(Charsets.UTF_8).size else 0
+        estimateChat(chat)+config.maxTokens+512+if(withTools && config.toolsEnabled) AgentTools.definitions().toString().toByteArray(Charsets.UTF_8).size else 0
 
     /**
      * 每次请求（包括工具执行后的继续回答）之前检查 80% 水位。
@@ -504,7 +500,7 @@ object AgentSession {
                     append('\n')
                 }
             }
-            val summaryConfig=config.copy(maxTokens=minOf(1024,config.contextTokens/8),effort="off")
+            val summaryConfig=config.copy(maxTokens=minOf(4096,config.contextTokens/4),effort="default",extraJson="{}")
             // 小窗口或用户降低窗口后分块压缩，避免把已超长的上下文原样再次发给模型。
             var summary=""
             var offset=0
@@ -555,153 +551,13 @@ object AgentSession {
         withTools: Boolean = true): ModelReply {
         if(requestEstimate(chat,config,withTools)>config.contextTokens)
             throw AgentFailure("内容超过上下文预算，请新开会话或增大上下文窗口。")
-        val requestBody = JSONObject().put("model", MODEL).put("messages", chat).put("max_tokens", config.maxTokens).put("stream", useStream)
-        // 摘要请求完全不携带 tools，模型不能在压缩过程中请求电视操作。
-        if(withTools) requestBody.put("tools", AgentTools.definitions()).put("tool_choice", if (toolsAllowed) "auto" else "none")
-        requestBody.put("chat_template_kwargs", JSONObject().put("enable_thinking", config.effort != "off"))
-        if(config.effort != "off") requestBody.put("reasoning_effort",config.effort)
-        val body = requestBody.toString().toByteArray(Charsets.UTF_8)
-        val http = URL("https://apihub.agnes-ai.com/v1/chat/completions").openConnection() as HttpURLConnection
-        try {
-            synchronized(lock) {
-                if (job != generation) throw AgentFailure("已停止")
-                connection = http
-            }
-            http.requestMethod = "POST"
-            http.instanceFollowRedirects = false // 不把 Bearer Key 跟随重定向发送到其他主机。
-            http.connectTimeout = 15_000
-            http.readTimeout = 60_000
-            http.doOutput = true
-            http.setRequestProperty("Authorization", "Bearer $key")
-            http.setRequestProperty("Content-Type", "application/json")
-            http.setRequestProperty("Accept", if (useStream) "text/event-stream" else "application/json")
-            http.setFixedLengthStreamingMode(body.size)
-            http.outputStream.use { it.write(body) }
-            val code = http.responseCode
-            if (code !in 200..299) throw AgentFailure(when (code) {
-                401, 403 -> "Agnes 拒绝访问，请检查 API Key 和模型使用权限。"
-                429 -> "Agnes 额度不足或请求过于频繁，请检查账户后重试。"
-                400, 413, 422 -> "Agnes 未接受本次参数或内容。可先关闭思考、降低输出 Token；若发送本地图片，可改用公开图片链接。"
-                else -> "Agnes 服务暂时不可用（HTTP $code），请稍后重试。"
-            })
-            if (useStream && http.contentType.orEmpty().substringBefore(';').trim().equals("text/event-stream", true)) {
-                return readStream(http, job, onPartial)
-            }
-            // 限制云端响应体，避免异常接口耗尽电视内存；不把上游原始错误写入日志或网页。
-            val bytes = http.inputStream.use { input ->
-                val out = java.io.ByteArrayOutputStream()
-                val buffer = ByteArray(8192)
-                while (true) {
-                    val count = input.read(buffer)
-                    if (count < 0) break
-                    if (out.size() + count > 1_048_576) throw AgentFailure("模型回复过长，请缩短问题后重试。")
-                    out.write(buffer, 0, count)
-                }
-                out.toByteArray()
-            }
-            val choice = JSONObject(bytes.toString(Charsets.UTF_8)).optJSONArray("choices")?.optJSONObject(0)
-                ?: throw AgentFailure("模型响应格式无效。")
-            if (choice.optString("finish_reason") !in setOf("stop", "tool_calls")) throw AgentFailure("模型提前结束回答，未执行新工具。")
-            val message = choice.optJSONObject("message") ?: throw AgentFailure("模型响应格式无效。")
-            val content = message.opt("content") as? String ?: ""
-            return normalizeReply(content, message.optJSONArray("tool_calls") ?: JSONArray())
-        } finally { http.disconnect() }
-    }
-
-    /**
-     * 读取 OpenAI 兼容 SSE：按空行分事件，合并 data 行，忽略心跳、角色和 usage。
-     * UTF-8 Reader 保留跨网络包的中文字符；只消费 delta.content，不展示推理内部字段。
-     */
-    private fun readStream(http: HttpURLConnection, job: Long, onPartial: (String) -> Unit): ModelReply {
-        val answer = StringBuilder()
-        val toolFragments = sortedMapOf<Int, JSONObject>()
-        val event = StringBuilder()
-        var finished = false
-        var totalChars = 0
-        var lastPublish = 0L
-        var lastPublishedLength = 0
-        fun publish(force: Boolean = false) {
-            val now = System.nanoTime()
-            if (answer.length != lastPublishedLength && (force || now - lastPublish >= 120_000_000L)) {
-                onPartial(answer.toString())
-                lastPublishedLength = answer.length
-                lastPublish = now
-            }
-        }
-        fun consume(): Boolean {
-            val data = event.toString().trim()
-            event.setLength(0)
-            if (data.isEmpty()) return false
-            if (data == "[DONE]") { finished = true; return true }
-            val packet = runCatching { JSONObject(data) }.getOrElse { throw AgentFailure("模型流式数据格式异常，请关闭流式输出后重试。") }
-            if (packet.has("error")) throw AgentFailure("模型流式返回错误，请稍后重试。")
-            val choice = packet.optJSONArray("choices")?.optJSONObject(0) ?: return false
-            val delta = choice.optJSONObject("delta")
-            val fragments = delta?.optJSONArray("tool_calls") ?: JSONArray()
-            for (index in 0 until fragments.length()) {
-                val fragment = fragments.getJSONObject(index)
-                val slot = fragment.optInt("index", -1)
-                if (slot !in 0..7) throw AgentFailure("模型工具数量超出限制。")
-                val target = toolFragments.getOrPut(slot) { JSONObject().put("id", "").put("type", "function")
-                    .put("function", JSONObject().put("name", "").put("arguments", "")) }
-                if (fragment.opt("id") is String) target.put("id", target.getString("id") + fragment.getString("id"))
-                if (fragment.has("type") && fragment.optString("type") != "function") throw AgentFailure("不支持该模型工具类型。")
-                val function = fragment.optJSONObject("function")
-                val dest = target.getJSONObject("function")
-                for (field in listOf("name", "arguments")) {
-                    if (function?.opt(field) is String) dest.put(field, dest.getString(field) + function.getString(field))
-                }
-                if (target.optString("id").length > 128 || dest.optString("name").length > 64 || dest.optString("arguments").length > 16_384) throw AgentFailure("模型工具参数过长。")
-            }
-            val content = delta?.opt("content")
-            if (content is String) answer.append(content)
-            if (answer.length > 262_144) throw AgentFailure("模型回复过长，请缩短问题后重试。")
-            publish()
-            val reason = choice.opt("finish_reason")
-            if (reason is String && reason.isNotEmpty()) {
-                if (reason !in setOf("stop", "tool_calls")) throw AgentFailure(if (reason == "length") "已达到单次回答长度上限。" else "模型提前结束了回答。")
-                finished = true
-                return true
-            }
-            return false
-        }
-        try {
-            http.inputStream.bufferedReader(Charsets.UTF_8).use { reader ->
-                val line = StringBuilder()
-                var firstCharacter = true
-                while (true) {
-                    synchronized(lock) { if (job != generation) throw AgentFailure("已停止") }
-                    val next = reader.read()
-                    if (next < 0) {
-                        if (line.isNotEmpty()) {
-                            val tail = line.toString().removeSuffix("\r")
-                            if (tail.startsWith("data:")) event.append(tail.substring(5).removePrefix(" ")).append('\n')
-                        }
-                        if (event.isNotEmpty()) consume()
-                        break
-                    }
-                    // 对总流量和单行都设上限，避免无换行的异常响应绕过容量保护。
-                    if (++totalChars > 16_777_216) throw AgentFailure("模型流式数据过大，请缩短问题后重试。")
-                    if (firstCharacter && next == 0xFEFF) { firstCharacter = false; continue }
-                    firstCharacter = false
-                    if (next != '\n'.code) {
-                        line.append(next.toChar())
-                        if (line.length > 262_144) throw AgentFailure("模型流式数据行过长。")
-                        continue
-                    }
-                    val value = line.toString().removeSuffix("\r")
-                    line.setLength(0)
-                    if (value.isEmpty()) {
-                        if (consume()) break
-                    } else if (value.startsWith("data:")) {
-                        event.append(value.substring(5).removePrefix(" ")).append('\n')
-                        if (event.length > 524_288) throw AgentFailure("模型流式事件过大。")
-                    }
-                }
-            }
-        } finally { publish(force = true) }
-        if (!finished) throw AgentFailure("模型连接提前结束，请稍后重试。")
-        return normalizeReply(answer.toString(), JSONArray(toolFragments.values.toList()))
+        return try {
+            val reply=AgentModelClient.request(config.copy(key=key),chat,useStream,toolsAllowed,withTools,onPartial,
+                onConnection={http->synchronized(lock){if(job!=generation)throw AgentFailure("已停止");connection=http}},
+                checkActive={synchronized(lock){if(job!=generation)throw AgentFailure("已停止")}})
+            val checked=normalizeReply(reply.text,reply.calls)
+            checked.copy(native=reply.native,chatMessage=reply.chatMessage)
+        } catch(failure:AgentModelClient.Failure){throw AgentFailure(failure.message.orEmpty())}
     }
 
     private class AgentFailure(message: String) : Exception(message)

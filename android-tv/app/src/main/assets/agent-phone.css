@@ -31,3 +31,31 @@
 .agent-context-note{font-size:12px;line-height:1.7;color:#61665e;overflow-wrap:anywhere;margin:0 0 16px}
 .agent-session-create{display:flex;flex-wrap:wrap;gap:8px}.agent-session-create button{flex:1;min-height:44px}
 .agent-session-list{margin-top:18px}.agent-session-row{display:flex;align-items:center;gap:8px;border-top:1px solid #deded8;padding:8px 0}.agent-session-row>button:first-child{flex:1;min-width:0;text-align:left;border:0;background:transparent;padding:10px 4px}.agent-session-row strong{display:block;font-size:14px;font-weight:500;overflow-wrap:anywhere}.agent-session-row small{display:block;color:#62665e;font-size:11px;margin-top:6px}.agent-session-delete{flex:none;font-size:12px;min-height:44px;padding:0 10px}
+
+/* 提供商 → 模型：宽屏左右管理，手机按当前提供商展开，保持现有暖白页面。 */
+.agent-modal [hidden]{display:none!important}
+.agent-modal.is-provider-settings .agent-modal-card{width:min(1120px,100%)}
+.provider-active{padding:12px 14px;background:#eeeee8;border-radius:10px;overflow-wrap:anywhere}
+.provider-layout{display:grid;grid-template-columns:210px minmax(0,1fr);gap:28px;margin-top:24px}
+.provider-sidebar{border-right:1px solid #deded8;padding-right:20px;min-width:0}
+.provider-sidebar-title{display:flex;justify-content:space-between;font-size:13px;color:#61665e;margin-bottom:14px}
+.provider-list{display:grid;gap:8px;max-height:46vh;overflow:auto}
+.provider-nav-item{width:100%;text-align:left;min-height:66px;padding:12px;border:0;background:transparent;overflow-wrap:anywhere}
+.provider-nav-item[aria-pressed="true"]{background:#f4e5e9;color:#ad435f}.provider-nav-item strong{display:block;font-size:14px;font-weight:550}.provider-nav-item small{display:block;font-size:11px;margin-top:6px;color:#6c7067}
+.provider-sidebar>button{margin-top:12px;width:100%;min-height:44px;border-style:dashed;font-size:13px}
+.provider-editor{min-width:0}.provider-editor-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}.provider-editor-head>div{min-width:0}.provider-editor-head h3{overflow-wrap:anywhere;font-size:24px;font-weight:550;margin:0}.provider-editor-head p{margin:8px 0}.provider-editor-head>button{font-size:12px;min-height:44px;max-width:170px}
+.provider-field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 18px}.provider-full{grid-column:1/-1}
+.provider-field-grid small{display:block;font-size:11px;line-height:1.6;margin-top:8px;color:#74776f}
+.provider-editor input,.provider-editor select{min-width:0}
+.agent-modal .provider-check{display:flex;align-items:center;gap:10px;font-size:13px;min-height:44px;margin-top:8px}
+.agent-modal .provider-check input{width:18px;height:18px;padding:0;margin:0;flex:none;accent-color:#ad435f}
+.provider-key-reuse{padding:8px 12px;background:#f4e5e9;border-radius:10px}
+.provider-advanced{margin-top:18px;border-top:1px solid #deded8;padding-top:12px}.provider-advanced summary,.agent-shared-settings summary{font-size:13px;cursor:pointer;min-height:44px;display:flex;align-items:center;gap:8px}.provider-advanced summary::before,.agent-shared-settings summary::before{content:'＋';font-size:16px}.provider-advanced[open] summary::before,.agent-shared-settings[open] summary::before{content:'−'}
+.provider-model-head{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-top:28px;border-top:1px solid #deded8;padding-top:20px}.provider-model-head h4{font-size:17px;margin:0}.provider-model-head h4 span{font-size:12px;color:#74776f;margin-left:6px}.provider-model-head>div{display:flex;gap:8px;flex-wrap:wrap}.provider-model-head button{font-size:12px;min-height:44px;padding:0 10px}
+.provider-models{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.provider-models button{font-size:13px;min-height:44px;padding:10px 14px;max-width:100%;overflow-wrap:anywhere;text-align:left}.provider-models button[aria-pressed="true"]{color:#ad435f;border-color:#ad435f;background:#f8edf0}
+.provider-model-card{border:1px solid #deded8;border-radius:16px;padding:18px;margin-top:18px;background:white}.provider-model-card-head{display:flex;justify-content:space-between;gap:12px;align-items:center}.provider-model-card-head button{font-size:12px;min-height:44px}.provider-model-card-head .provider-check{margin:0}.provider-capabilities{display:flex;gap:16px;flex-wrap:wrap}.provider-model-card textarea{width:100%;min-height:110px;max-height:260px;resize:vertical;border:1px solid #b7bcb1;border-radius:10px;margin-top:8px;padding:12px;font-size:16px;font-family:monospace}.provider-model-card>#providerUseModel{min-height:44px;margin-top:14px;width:100%}
+.provider-import{background:#efefe8;border-radius:12px;padding:0 14px 12px;margin-top:16px}.provider-import button{font-size:12px;min-height:44px;margin-top:10px}.provider-import select{width:100%;overflow:hidden}.provider-import input{font-size:14px}
+.provider-save-bar{position:sticky;bottom:-24px;padding:12px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;background:#f9f8f6;border-top:1px solid #deded8;margin-top:24px;z-index:2}.provider-save-bar span{font-size:11px;line-height:1.6;color:#74776f}.provider-save-bar button{min-height:44px;flex:none;font-size:13px}
+.agent-shared-settings{border-top:1px solid #deded8;margin-top:24px;padding-top:12px}.agent-modal .provider-mobile-picker{display:none}
+.agent-head p,.agent-foot p{overflow-wrap:anywhere}.agent-head>div{min-width:0}
+@media(max-width:700px){.provider-layout{grid-template-columns:minmax(0,1fr);gap:22px}.provider-sidebar{border:0;padding:0;display:grid;grid-template-columns:1fr auto;gap:0 12px}.provider-sidebar-title{grid-column:1/-1;margin:0}.provider-list{display:none}.agent-modal .provider-mobile-picker{display:block;grid-column:1/-1}.provider-sidebar>label:not(.provider-mobile-picker){min-width:0;margin-top:12px}.provider-sidebar>button{align-self:end;width:auto;margin-bottom:0;padding:0 12px}.provider-field-grid{grid-template-columns:minmax(0,1fr)}.provider-editor-head>div{min-width:0}.provider-editor-head h3{overflow-wrap:anywhere;font-size:21px}.provider-model-card{padding:12px}.provider-save-bar{bottom:-20px}.provider-model-head>div{width:100%}.provider-model-head button{flex:1}.provider-save-bar span{max-width:55%}}

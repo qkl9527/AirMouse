@@ -6,7 +6,7 @@
   const view = document.createElement('section');
   view.className = 'view agent-view'; view.id = 'view-agent'; view.dataset.view = 'agent';
   view.innerHTML = `
-    <header class="agent-head"><div><h1>客厅 Agent</h1><p>Agnes 3.0 Flash · Demo</p></div><button type="button" class="agent-settings-button" id="agentSettings">模型设置</button></header>
+    <header class="agent-head"><div><h1>客厅 Agent</h1><p id="agentModelLabel">选择提供商和模型</p></div><button type="button" class="agent-settings-button" id="agentSettings">模型设置</button></header>
     <button type="button" class="agent-session-entry" id="agentSessions"><span><small id="agentSessionKind">当前会话 · 保存在电视</small><strong id="agentSessionTitle">新会话</strong></span><span>切换 / 新建 ↗</span></button>
     <p class="agent-context-note" id="agentContextNotice" role="status" hidden></p>
     <div class="agent-launch"><div><strong id="agentTvTitle">让答案在电视上展开</strong><p id="agentTvStatus">手机提问，电视同步展示</p></div><button type="button" id="agentOpen">在电视打开</button></div>
@@ -24,7 +24,7 @@
       <div class="agent-composer-tools"><div class="agent-compose-actions"><button type="button" id="agentPick">＋ 图片</button><button type="button" id="agentImageLink">图片链接</button></div><button type="submit" class="agent-send" id="agentSend">发送</button><button type="button" id="agentStop" hidden>停止</button></div>
       <input type="file" id="agentFile" accept="image/jpeg,image/png,image/webp" hidden>
     </form>
-    <div class="agent-foot"><p>已配对手机共享本次对话。内容发送至 Agnes AI。</p><button type="button" id="agentClear">新对话</button></div>
+    <div class="agent-foot"><p id="agentProviderFoot">已配对手机共享本次对话。</p><button type="button" id="agentClear">新对话</button></div>
     </div></section>`;
   document.querySelector('main.app').append(view);
   const nav = document.createElement('button');
@@ -34,12 +34,12 @@
   scenesNav.parentNode.insertBefore(nav, scenesNav);
   nav.addEventListener('click', () => { transport.showPanel('agent'); sync(); });
   const modal = document.createElement('div'); modal.className = 'agent-modal'; modal.hidden = true;
-  modal.innerHTML = `<section class="agent-modal-card" role="dialog" aria-modal="true" aria-labelledby="agentModalTitle" tabindex="-1"><div class="agent-modal-head"><h2 id="agentModalTitle">模型设置</h2><button type="button" id="agentModalClose" aria-label="关闭面板">关闭</button></div><div id="agentConfigFields"><div class="agent-stream-setting"><div><strong>流式输出</strong><p>逐步显示回答，自动跟随最新内容。更改从下一条问题生效。</p></div><button type="button" id="agentStreamToggle" role="switch" aria-checked="true">开启</button></div><p class="agent-model-tag">Agnes AI / agnes-3.0-flash<br>接入地址已固定，无需填写。</p><label for="agentKey">API Key<input id="agentKey" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" maxlength="512" aria-describedby="agentKeyLength" placeholder="粘贴 Agnes API Key"></label><p id="agentKeyLength">已输入 0 字符 · 最多 512 字符</p><p id="agentConfigStatus">尚未配置</p><div class="agent-model-grid"><label for="agentContextTokens">上下文窗口（Token）<input id="agentContextTokens" type="number" min="4096" max="512000" step="1" value="32768"></label><label for="agentMaxTokens">最大输出 Token<input id="agentMaxTokens" type="number" min="128" max="65536" step="1" value="2048"></label></div><p>上下文预算达到 80% 时自动压缩历史，保留当前问题与完整工具过程；预算包含预计输出与工具定义。</p><label for="agentEffort">思考强度<select id="agentEffort"><option value="off">关闭</option><option value="low">低 · 更快</option><option value="medium">中 · 均衡</option><option value="high">高 · 更充分</option></select></label><p>按 OpenAI reasoning_effort 传参，Agnes 是否支持各档位以接口返回为准。</p><label for="agentTextSize">电视文字大小 <output id="agentTextSizeValue">28</output><input id="agentTextSize" type="range" min="12" max="48" step="1" value="28"></label><p>调整后立即同步到电视；模型参数点击保存后生效。</p><p>Key 使用 Android Keystore 加密保存在电视上，手机不会读取原文。普通 HTTP 模式通过局域网传输，请在可信网络中配置。</p><p><a href="https://agnes-ai.com/en/docs/agnes-30-flash" target="_blank" rel="noopener noreferrer">查看 Agnes 接入文档</a></p><div class="button-row"><button type="button" id="agentForget">移除 Key</button><button type="button" class="accent" id="agentSave">保存配置</button></div></div><div id="agentLinkFields" hidden><label for="agentUrl">公开 HTTPS 图片链接<input id="agentUrl" type="url" placeholder="https://…/photo.jpg" maxlength="2048"></label><p>Agnes 将读取这张图片。不要使用需要登录或仅局域网可见的地址。</p><button type="button" class="accent" id="agentUseUrl">添加图片</button></div><div id="agentClearFields" hidden><p id="agentSessionHint">普通会话保存在电视，随时回来继续。一次性对话离开后不保留。所有已配对手机共享当前会话。</p><div class="agent-session-create"><button type="button" class="accent" id="agentConfirmClear">＋ 新建会话</button><button type="button" id="agentTemporary">一次性对话</button></div><p id="agentSessionBusy" hidden>请先停止当前回答或等待操作完成，再切换会话。</p><div id="agentSessionList" class="agent-session-list"></div></div><p id="agentModalError" class="agent-error" role="alert"></p></section>`;
+  modal.innerHTML = `<section class="agent-modal-card" role="dialog" aria-modal="true" aria-labelledby="agentModalTitle" tabindex="-1"><div class="agent-modal-head"><h2 id="agentModalTitle">模型设置</h2><button type="button" id="agentModalClose" aria-label="关闭面板">关闭</button></div><div id="agentConfigFields"><div id="agentProviderSettings"></div><details class="agent-shared-settings"><summary>共用显示设置</summary><div class="agent-stream-setting"><div><strong>流式输出</strong><p>逐步显示回答，自动跟随最新内容。更改从下一条问题生效。</p></div><button type="button" id="agentStreamToggle" role="switch" aria-checked="true">开启</button></div><label for="agentTextSize">电视文字大小 <output id="agentTextSizeValue">28</output><input id="agentTextSize" type="range" min="12" max="48" step="1" value="28"></label><p>立即同步到电视。普通 HTTP 模式的配置经局域网传输，请在可信网络中配置。</p></details></div><div id="agentLinkFields" hidden><label for="agentUrl">公开 HTTPS 图片链接<input id="agentUrl" type="url" placeholder="https://…/photo.jpg" maxlength="2048"></label><p>当前模型提供商将读取这张图片。不要使用需要登录或仅局域网可见的地址。</p><button type="button" class="accent" id="agentUseUrl">添加图片</button></div><div id="agentClearFields" hidden><p id="agentSessionHint">普通会话保存在电视，随时回来继续。一次性对话离开后不保留。所有已配对手机共享当前会话。</p><div class="agent-session-create"><button type="button" class="accent" id="agentConfirmClear">＋ 新建会话</button><button type="button" id="agentTemporary">一次性对话</button></div><p id="agentSessionBusy" hidden>请先停止当前回答或等待操作完成，再切换会话。</p><div id="agentSessionList" class="agent-session-list"></div></div><p id="agentModalError" class="agent-error" role="alert"></p></section>`;
   document.body.append(modal);
   const $ = id => document.getElementById(id);
   let state = { configured:false, busy:false, tvVisible:false, revision:-1, messages:[] };
   let image = '', imageName = '', preparing = false, imageGeneration = 0, localError = '', connected = false;
-  let returnFocus = null, openingTimer = null, submission = null, configDirty=false, sizeTimer=null;
+  let returnFocus = null, openingTimer = null, submission = null, sizeTimer=null;
   const pending = new Map();
   const drafts=new Map();
   let sessionChanging=false, deleteArmed=null;
@@ -51,17 +51,17 @@
     const timer = setTimeout(() => {
       pending.delete(id);
       (onError || showError)('电视暂未确认，请检查连接。已发送的内容可能已被接收，请先核对对话。');
-    }, 12000);
+    }, type==='agent_provider_models'?45000:12000);
     pending.set(id, { timer, type, onSuccess, onError });
     return id;
   }
   function sync() { command('agent_sync'); }
-  function updateKeyLength() { $('agentKeyLength').textContent = `已输入 ${$('agentKey').value.trim().length} 字符 · 最多 512 字符`; }
-  $('agentKey').addEventListener('input', updateKeyLength);
-  function closeModal() { modal.hidden = true; $('agentKey').value = ''; updateKeyLength(); if(returnFocus) returnFocus.focus(); }
+  const providerUI=window.createAgentProviderSettings($('agentProviderSettings'),{command,notify:message=>{$('agentProgress').textContent=message;}});
+  function closeModal() { modal.hidden = true; providerUI.close(); if(returnFocus) returnFocus.focus(); }
   function openModal(kind) {
     returnFocus = document.activeElement;
-    if(kind==='config'){configDirty=false;syncConfiguration();}
+    if(kind==='config'){providerUI.open(state.providerSettings,state.busy);syncConfiguration();}
+    modal.classList.toggle('is-provider-settings',kind==='config');
     if(kind==='clear')renderSessions();
     $('agentConfigFields').hidden = kind !== 'config'; $('agentLinkFields').hidden = kind !== 'link'; $('agentClearFields').hidden = kind !== 'clear';
     $('agentModalTitle').textContent = {config:'模型设置',link:'添加图片链接',clear:'会话'}[kind];
@@ -77,34 +77,23 @@
   modal.addEventListener('keydown', event => {
     if(event.key === 'Escape') { closeModal(); return; }
     if(event.key !== 'Tab') return;
-    const nodes = [...modal.querySelectorAll('button,a,input,[tabindex="0"]')].filter(node => !node.disabled && node.getClientRects().length);
+    const nodes = [...modal.querySelectorAll('button,a,input,select,textarea,summary,[tabindex="0"]')].filter(node => !node.disabled && node.getClientRects().length);
     const first = nodes[0], last = nodes[nodes.length - 1];
     if(event.shiftKey && (document.activeElement === first || document.activeElement === modal.querySelector('[role="dialog"]'))) { event.preventDefault(); last.focus(); }
     else if(!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
   });
-  $('agentSave').onclick = () => {
-    const key = $('agentKey').value.trim();
-    if(!key && !state.configured) { $('agentModalError').textContent = '请先填写 API Key。'; $('agentKey').focus(); return; }
-    $('agentSave').disabled = true;
-    command('agent_configure', { apiKey:key, contextTokens:Number($('agentContextTokens').value),maxTokens:Number($('agentMaxTokens').value),effort:$('agentEffort').value,textSize:Number($('agentTextSize').value) }, () => { $('agentSave').disabled = false; closeModal(); $('agentProgress').textContent = '配置已保存，可以发送第一个问题。'; }, message => { $('agentSave').disabled = false; $('agentModalError').textContent = message; });
-  };
   function syncConfiguration(){
-    if(configDirty)return;
-    const config=state.configuration || {};
-    $('agentContextTokens').value=config.contextTokens || 32768;
-    $('agentMaxTokens').value=config.maxTokens || 2048;
-    $('agentEffort').value=config.effort || 'off';
-    $('agentTextSize').value=config.textSize || 28;
-    $('agentTextSizeValue').textContent=String(config.textSize || 28);
+    providerUI.sync(state.providerSettings,state.busy);
+    if(document.activeElement!==$('agentTextSize')){
+      $('agentTextSize').value=state.configuration?.textSize || 28;
+      $('agentTextSizeValue').textContent=String(state.configuration?.textSize || 28);
+    }
   }
-  ['agentContextTokens','agentMaxTokens','agentEffort'].forEach(id=>$(id).addEventListener('input',()=>{configDirty=true;}));
   $('agentTextSize').addEventListener('input',()=>{
-    configDirty=true; $('agentTextSizeValue').textContent=$('agentTextSize').value;
-    clearTimeout(sizeTimer);
+    $('agentTextSizeValue').textContent=$('agentTextSize').value;clearTimeout(sizeTimer);
     const value=Number($('agentTextSize').value);
     sizeTimer=setTimeout(()=>command('agent_text_size',{value},null,message=>{$('agentModalError').textContent=message;}),250);
   });
-  $('agentForget').onclick = () => command('agent_forget', {}, closeModal, message => { $('agentModalError').textContent = message; });
   function changeSession(type,values){
     if(sessionChanging || state.busy || submission)return;
     sessionChanging=true;renderSessions();renderControls();
@@ -216,18 +205,19 @@
     submission=null;attachment();
   }
   function renderControls() {
+    $('agentModelLabel').textContent=state.model?`${state.providerName} / ${state.model}`:'选择提供商和模型';
+    $('agentProviderFoot').textContent=state.model?`已配对手机共享对话 · 发送至 ${state.providerName}`:'在模型设置中选择提供商后开始。';
     $('agentSend').hidden=state.busy; $('agentStop').hidden=!state.busy;
     $('agentSend').textContent=state.configured?'发送':'配置模型';
     $('agentSend').disabled=preparing || !!submission || sessionChanging || !state.session || (state.configured && !$('agentText').value.trim() && !image);
     $('agentPick').disabled=preparing;$('agentImageLink').disabled=preparing;
-    $('agentConfigStatus').textContent=state.configured?'已配置 · Key 已加密保存，留空可保留原 Key':'尚未配置 · 保存后即可开始';
-    $('agentProgress').textContent=preparing?'正在压缩图片…':submission?'正在发送至电视…':state.compacting?'上下文已达 80% · 正在压缩记忆，完成后继续回答…':state.approval?(state.approval.phase==='pending'?'等待手机确认操作…':'正在执行已允许的操作…'):state.busy?(state.messages?.[state.messages.length-1]?.role==='assistant'?'Agnes 正在回答…':'电视已收到 · Agnes 正在思考…'):'';
+    $('agentProgress').textContent=preparing?'正在压缩图片…':submission?'正在发送至电视…':state.compacting?'上下文已达 80% · 正在压缩记忆，完成后继续回答…':state.approval?(state.approval.phase==='pending'?'等待手机确认操作…':'正在执行已允许的操作…'):state.busy?(state.messages?.[state.messages.length-1]?.role==='assistant'?'模型正在回答…':'电视已收到 · 模型正在思考…'):'';
     $('agentContextNotice').textContent=[state.contextNotice,state.contextEstimate?`上下文预算约 ${Math.round(state.contextEstimate/(state.configuration?.contextTokens || 32768)*100)}%（含输出预留）`:'',state.storageWarning].filter(Boolean).join(' · ');
     $('agentContextNotice').hidden=!$('agentContextNotice').textContent;
     $('agentError').textContent=localError || state.error || ''; $('agentError').hidden=!$('agentError').textContent;
   }
   const conversation=window.createAgentConversation($('agentMessages'), {
-    messageClass:'agent-message',roleTag:'small',copyTag:'p',imageLabelClass:'agent-image-note',userLabel:'你',
+    messageClass:'agent-message',roleTag:'small',copyTag:'p',imageLabelClass:'agent-image-note',userLabel:'你',assistantLabel:'助手 / 回答',
     canScroll:()=>view.classList.contains('active') && modal.hidden && !state.approval,
     // 使用实际输入区顶边作为阅读底线；展开、附图和软键盘都会改变可阅读高度。
     clearance:()=>window.innerHeight-$('agentComposerDock').getBoundingClientRect().top+16
@@ -365,7 +355,7 @@
     if(message.type==='agent_result'){
       const request=pending.get(message.requestId);if(!request)return;
       clearTimeout(request.timer);pending.delete(message.requestId);
-      if(message.ok){localError='';if(request.onSuccess)request.onSuccess();}
+      if(message.ok){localError='';if(request.onSuccess)request.onSuccess(message);}
       else (request.onError || showError)(message.message || '操作失败');
       renderControls();
     }
@@ -374,15 +364,15 @@
       connected=message.connected;
       renderApproval(state.approval);
       renderSessions();
-      if(connected) { configDirty=false;state={...state,revision:-1};sync(); }
+      if(connected) { state={...state,revision:-1};sync(); }
       else {
         const code=Number.isInteger(message.closeCode)?`（关闭码 ${message.closeCode}）`:'';
         // 保存配置时的断线应显示在当前面板中，不能只提示被面板遮住的聊天草稿。
         // 这里只显示关闭码和长度，不记录或回显 Key 内容；也不自动重发配置。
         for(const [id,request] of pending){
-          if(request.type!=='agent_configure') continue;
+          if(!request.type.startsWith('agent_provider_')) continue;
           clearTimeout(request.timer);pending.delete(id);
-          if(request.onError) request.onError(`保存配置时电视连接断开${code}，尚未确认保存。请等待重连后重试。`);
+          if(request.onError) request.onError(`提供商操作时电视连接断开${code}，请等待重连后核对配置。`);
         }
         $('agentTvStatus').textContent='连接已断开，正在重连…';
         showError(`电视连接已断开${code}，草稿仍保留。重连后会同步对话，请勿重复发送。`);
