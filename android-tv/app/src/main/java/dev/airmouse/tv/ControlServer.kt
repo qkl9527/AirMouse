@@ -45,7 +45,8 @@ object ControlServer {
     private const val DEFAULT_PORT = 8765
     private const val DEFAULT_HTTPS_PORT = 8766
     private const val MAX_HEADER_BYTES = 8192
-    private const val MAX_FRAME_BYTES = 16 * 1024
+    // 选图先由手机压缩；仅 Agent 允许大消息，原遥控协议仍维持 16 KiB 校验。
+    private const val MAX_FRAME_BYTES = 768 * 1024
     private const val MAX_CLIENTS = 4
     private const val WEB_SOCKET_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
@@ -53,6 +54,8 @@ object ControlServer {
         fun onAction(action: RemoteAction)
         fun onClientCountChanged(count: Int)
         fun onPartyState(state: JSONObject) = Unit
+        fun onAgentApproval(state: JSONObject?) = Unit
+        fun foregroundPackage(): String? = null
     }
 
     private val lifecycleLock = Any()
@@ -66,6 +69,8 @@ object ControlServer {
     private val pendingPartyDisconnects = ConcurrentHashMap<String, ScheduledFuture<*>>()
     private val clientCount = AtomicInteger(0)
     private val workers: ExecutorService = Executors.newCachedThreadPool()
+    // 流式增量与最终完整状态按顺序发送，避免并发广播让手机先看到结束、再收到旧片段。
+    private val agentNotifications: ExecutorService = Executors.newSingleThreadExecutor()
     private val partyDisconnectScheduler = Executors.newSingleThreadScheduledExecutor { runnable ->
         Thread(runnable, "airmouse-party-disconnect").apply { isDaemon = true }
     }
@@ -112,6 +117,24 @@ object ControlServer {
         serverSocket = server
         listener = actionListener
         applicationContext = context.applicationContext
+        AgentSession.initialize(context.applicationContext)
+        AgentSession.onChanged = {
+            val state = AgentSession.snapshot().toString()
+            agentNotifications.execute {
+                if (generation == serverGeneration) {
+                    clientOutputs.values.forEach { output -> runCatching { writeTextFrame(output, state) } }
+                }
+            }
+        }
+        AgentSession.onDelta = { delta ->
+            val message = delta.toString()
+            agentNotifications.execute {
+                if (generation == serverGeneration) {
+                    clientOutputs.values.forEach { output -> runCatching { writeTextFrame(output, message) } }
+                }
+            }
+        }
+        AgentSession.onApprovalChanged = { approval -> listener?.onAgentApproval(approval) }
         pairingToken = token
         pairingUrl = url
         pageBytes = runCatching { context.applicationContext.assets.open("remote.html").use { it.readBytes() } }
@@ -139,6 +162,10 @@ object ControlServer {
     }
 
     fun stop() = synchronized(lifecycleLock) {
+        AgentSession.onChanged = null
+        AgentSession.onDelta = null
+        AgentSession.onApprovalChanged = null
+        AgentSession.cancel(clear = true, forgetKey = true)
         serverGeneration++
         pairingToken = null
         pairingUrl = null
@@ -213,6 +240,12 @@ object ControlServer {
             }
 
             when (uri.rawPath ?: "/") {
+                "/agent-phone.css", "/agent-phone.js", "/agent-conversation.js" -> {
+                    val name = uri.rawPath.removePrefix("/")
+                    val body = applicationContext?.assets?.open(name)?.use { it.readBytes() } ?: return
+                    val type = if (name.endsWith(".css")) "text/css" else "application/javascript"
+                    output.writeHttpResponse(200, "OK", "$type; charset=utf-8", body)
+                }
                 "/" -> {
                     output.writeHttpResponse(200, "OK", "text/html; charset=utf-8", pageBytes)
                 }
@@ -270,6 +303,7 @@ object ControlServer {
                     writeWebSocketUpgrade(output, webSocketAccept)
             if (!activateClient(socket, output, generation)) return
                     writeTextFrame(output, "{\"type\":\"status\",\"connected\":true,\"keyboardProtocol\":3}")
+                    writeTextFrame(output, AgentSession.snapshot().toString())
                     readWebSocketMessages(socket, input, output)
                 }
 
@@ -456,10 +490,14 @@ object ControlServer {
             val isFinal = first and 0x80 != 0
             val opcode = first and 0x0f
             val isMasked = second and 0x80 != 0
-            var length = (second and 0x7f).toLong()
-
-            if (length == 126L) length = frames.readUnsignedShort().toLong()
-            if (length == 127L) length = frames.readLong()
+            // 必须按帧头中的长度标记只分支一次。若先读 16 位长度得到 127，
+            // 再用独立 if 判断 127，会把掩码和正文误当成 64 位长度，直接断开连接。
+            // 这里的边界是整条 JSON 的 UTF-8 字节数，并不是 API Key 的字符数。
+            val length = when (val lengthMarker = second and 0x7f) {
+                126 -> frames.readUnsignedShort().toLong()
+                127 -> frames.readLong()
+                else -> lengthMarker.toLong()
+            }
             if (!isFinal || !isMasked || length < 0 || length > MAX_FRAME_BYTES) {
                 writeCloseFrame(output, 1009)
                 return
@@ -474,6 +512,11 @@ object ControlServer {
             when (opcode) {
                 0x1 -> {
                     val message = payload.toString(StandardCharsets.UTF_8)
+                    val json = runCatching { JSONObject(message) }.getOrNull()
+                    if (json != null && json.optString("type").startsWith("agent_")) {
+                        handleAgentMessage(json, output, socket)
+                        continue
+                    }
                     when (val action = ControlMessage.decode(message)) {
                         is RemoteAction.ListApps -> writeTextFrame(output, listAppsMessage(action.requestId))
 
@@ -552,6 +595,55 @@ object ControlServer {
 
     private fun writeTextFrame(output: DataOutputStream, message: String) {
         writeFrame(output, 0x1, message.toByteArray(StandardCharsets.UTF_8))
+    }
+
+    /** Agent 复用已配对 WS；Key 不出现在 URL、日志或回包中，持久化只走加密配置。 */
+    private fun handleAgentMessage(json: JSONObject, output: DataOutputStream, socket: Socket) {
+        val id = json.optString("requestId")
+        if (!id.matches(Regex("[A-Za-z0-9_-]{1,96}"))) return
+        val error = when (json.optString("type")) {
+            "agent_configure" -> AgentSession.configure(json)
+            "agent_text_size" -> {
+                val value=json.opt("value")
+                if(value !is Number || value.toDouble()!=value.toInt().toDouble()) "字号必须为整数。"
+                else AgentSession.setTextSize(value.toInt())
+            }
+            "agent_stream" -> {
+                val enabled = json.opt("enabled")
+                val context = applicationContext
+                if (enabled !is Boolean || context == null) "无法保存流式输出设置，请重新连接电视。"
+                else { AgentSession.setStreaming(context, enabled); null }
+            }
+            "agent_send" -> {
+                val owner = partyClientIds[socket]
+                if (owner == null) "手机身份尚未完成配对，请稍后重试。"
+                else AgentSession.send(id, json.optString("text").trim(), json.optString("image"), owner,
+                    AgentTools.context(json.optJSONObject("context") ?: JSONObject(), installedApps()), json.optString("sessionId"))
+            }
+            "agent_decide" -> {
+                val owner = partyClientIds[socket]
+                val decision = json.opt("allow")
+                if (owner == null || decision !is Boolean) "手机身份或确认参数无效。"
+                else AgentSession.decide(owner, json.optString("approvalId"), decision)
+            }
+            "agent_stop" -> { AgentSession.cancel(); null }
+            // 兼容旧版“新对话”入口：归档旧会话，不再清除历史。
+            "agent_clear" -> AgentSession.selectSession()
+            "agent_session_new" -> {
+                val temporary=json.opt("temporary")
+                if(temporary !is Boolean) "会话类型无效。" else AgentSession.selectSession(temporary=temporary, expectedSessionId=json.optString("expectedSessionId"))
+            }
+            "agent_session_switch" -> AgentSession.selectSession(id=json.optString("sessionId"), expectedSessionId=json.optString("expectedSessionId"))
+            "agent_session_delete" -> AgentSession.deleteSession(json.optString("sessionId"))
+            "agent_forget" -> AgentSession.forgetConfigurationKey()
+            "agent_open" -> { listener?.onAction(RemoteAction.OpenAgent(id)); null }
+            "agent_sync" -> null
+            "agent_latest" -> { AgentSession.scrollToLatestAnswer(); null }
+            else -> "未知 Agent 操作，请更新电视 App。"
+        }
+        writeTextFrame(output, JSONObject().put("type", "agent_result").put("requestId", id)
+            .put("ok", error == null).put("message", error ?: "已收到").toString())
+        writeTextFrame(output, AgentSession.snapshot().toString())
     }
 
     private fun sendPartyTransition(output: DataOutputStream, transition: PartyRoom.Transition) {
@@ -659,6 +751,7 @@ object ControlServer {
 
     /** 操作结果携带请求号广播；只有发起该请求的手机会认领这条结果。 */
     fun notifyActionResult(requestId: String, success: Boolean, message: String) {
+        if (AgentTools.complete(requestId, success, message)) return
         val response = JSONObject()
             .put("type", "action_result")
             .put("requestId", requestId)
@@ -669,11 +762,14 @@ object ControlServer {
     }
 
     private fun listAppsMessage(requestId: String): String {
-        val context = applicationContext ?: return JSONObject()
-            .put("type", "apps").put("requestId", requestId).put("items", org.json.JSONArray()).toString()
-        val launchIntent = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
+        return JSONObject().put("type", "apps").put("requestId", requestId).put("items", installedApps()).toString()
+    }
+
+    private fun installedApps(): org.json.JSONArray {
+        val context = applicationContext ?: return org.json.JSONArray()
         @Suppress("DEPRECATION")
-        val apps = context.packageManager.queryIntentActivities(launchIntent, 0)
+        val apps = listOf(Intent.CATEGORY_LAUNCHER, Intent.CATEGORY_LEANBACK_LAUNCHER)
+            .flatMap { category -> context.packageManager.queryIntentActivities(Intent(Intent.ACTION_MAIN).addCategory(category), 0) }
             .mapNotNull { resolve ->
                 val activity = resolve.activityInfo ?: return@mapNotNull null
                 JSONObject()
@@ -682,11 +778,35 @@ object ControlServer {
             }
             .distinctBy { it.optString("packageName") }
             .sortedBy { it.optString("label").lowercase(Locale.ROOT) }
-        return JSONObject()
-            .put("type", "apps")
-            .put("requestId", requestId)
-            .put("items", org.json.JSONArray(apps))
-            .toString()
+        return org.json.JSONArray(apps)
+    }
+
+    fun agentForegroundPackage(): String? = listener?.foregroundPackage()
+
+    /** 此入口只接收 AgentTools 已批准的步骤，不能由网络直接给出执行计划。 */
+    fun executeAgentStep(step: AgentTools.Step, requestId: String, owner: String, allowed: () -> Boolean) {
+        if (!allowed()) { AgentTools.complete(requestId, false, "操作已取消。"); return }
+        val command = JSONObject(step.command.toString()).put("requestId", requestId).put("clientId", owner)
+        if (command.has("partySessionId") && command.optString("partySessionId") != PartyRoom.snapshot().optString("sessionId")) {
+            AgentTools.complete(requestId, false, "同乐活动已更换，本次确认不适用于新活动。"); return
+        }
+        val action = if (command.optString("type") == "agent_drag") {
+            RemoteAction.AgentDrag(command.getDouble("dx").toFloat(), command.getDouble("dy").toFloat())
+        } else ControlMessage.decode(command.toString())
+        val transition = when (action) {
+            is RemoteAction.StartQuiz -> PartyRoom.startQuiz(owner, action.question)
+            is RemoteAction.StartVote -> PartyRoom.startVote(owner, action.options)
+            is RemoteAction.Buzz -> PartyRoom.buzz(owner)
+            is RemoteAction.Vote -> PartyRoom.vote(owner, action.optionIndex)
+            is RemoteAction.EndParty -> PartyRoom.end(owner)
+            else -> null
+        }
+        if (transition != null) {
+            transition.state?.let(::broadcastPartyState)
+            AgentTools.complete(requestId, transition.error == null, transition.error ?: "同乐操作已提交。")
+        } else if (action == null || listener == null) {
+            AgentTools.complete(requestId, false, "电视服务不可用或操作参数无效。")
+        } else listener?.onAction(RemoteAction.AgentCommand(action, requestId, step.targetPackage, allowed))
     }
 
     private fun parseQuery(rawQuery: String?): Map<String, String> = rawQuery

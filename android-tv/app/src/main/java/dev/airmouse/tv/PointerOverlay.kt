@@ -18,10 +18,11 @@ import org.json.JSONObject
 
 /** 只负责显示光标；触屏事件仍由 AccessibilityService 统一派发。 */
 internal class PointerOverlay(
-    context: Context,
+    private val context: Context,
     private val windowManager: WindowManager,
 ) {
     private val cursorView = CursorView(context)
+    private var agentApprovalView: View? = null
     private val layoutParams = WindowManager.LayoutParams(
         WindowManager.LayoutParams.MATCH_PARENT,
         WindowManager.LayoutParams.MATCH_PARENT,
@@ -42,6 +43,32 @@ internal class PointerOverlay(
 
     fun hide() {
         if (cursorView.parent != null) runCatching { windowManager.removeView(cursorView) }
+        updateAgentApproval(null)
+    }
+
+    /** 即使已离开 Agent 页面，仍在电视上提示待确认动作；浮层不抢焦点、不执行批准。 */
+    fun updateAgentApproval(state: JSONObject?) {
+        agentApprovalView?.let { view -> runCatching { windowManager.removeView(view) } }
+        agentApprovalView = null
+        if (state == null) return
+        val density = context.resources.displayMetrics.density
+        val steps = state.optJSONArray("steps") ?: org.json.JSONArray()
+        val preview = (0 until steps.length()).joinToString("\n") { "${it + 1}. ${steps.optString(it)}" }.take(600)
+        val card = android.widget.TextView(context).apply {
+            text = "AirMouse Agent 请求操作\n${state.optString("title")}\n\n$preview\n\n请在发起对话的手机上选择「允许」或「拒绝」"
+            textSize = 18f
+            setTextColor(0xFFFFFFFF.toInt())
+            setPadding((24*density).toInt(),(18*density).toInt(),(24*density).toInt(),(18*density).toInt())
+            maxLines = 12
+            ellipsize = android.text.TextUtils.TruncateAt.END
+            background = android.graphics.drawable.GradientDrawable().apply { setColor(0xF0181B18.toInt()); cornerRadius=18*density }
+        }
+        val params = WindowManager.LayoutParams(
+            minOf((680*density).toInt(), context.resources.displayMetrics.widthPixels-(32*density).toInt()),
+            WindowManager.LayoutParams.WRAP_CONTENT, WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            PixelFormat.TRANSLUCENT).apply { gravity=Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL; y=(24*density).toInt() }
+        runCatching { windowManager.addView(card,params); agentApprovalView=card }
     }
 
     fun update(x: Float, y: Float, bounds: Rect) {

@@ -14,6 +14,7 @@ object PartyRoom {
     private var hostId: String? = null
     private var mode: String? = null
     private var question: String = ""
+    private var sessionId: String = ""
     private var options: List<String> = emptyList()
     private val votesByClient = linkedMapOf<String, Int>()
     private val playerLabels = linkedMapOf<String, String>()
@@ -34,6 +35,7 @@ object PartyRoom {
         if (mode != null) return@synchronized Transition(error = "电视上已有进行中的活动。")
         hostId = clientId
         mode = "quiz"
+        sessionId = java.util.UUID.randomUUID().toString()
         question = cleanPrompt
         options = emptyList()
         votesByClient.clear()
@@ -56,6 +58,7 @@ object PartyRoom {
         if (mode != null) return@synchronized Transition(error = "电视上已有进行中的活动。")
         hostId = clientId
         mode = "vote"
+        sessionId = java.util.UUID.randomUUID().toString()
         question = "今晚看哪部？"
         options = cleanCandidates
         votesByClient.clear()
@@ -99,6 +102,7 @@ object PartyRoom {
         val votesJson = JSONObject()
         votesByClient.forEach { (clientId, index) -> votesJson.put(clientId, index) }
         return JSONObject()
+            .put("sessionId", sessionId)
             .put("type", "party_state")
             .put("active", mode != null)
             .put("mode", mode ?: JSONObject.NULL)

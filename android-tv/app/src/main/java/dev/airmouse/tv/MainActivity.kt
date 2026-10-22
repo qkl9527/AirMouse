@@ -96,6 +96,9 @@ class MainActivity : Activity() {
         instructions.addView(actionButton(getString(R.string.enable_input_method)) {
             openSystemSettings(Settings.ACTION_INPUT_METHOD_SETTINGS)
         }, matchWrap())
+        instructions.addView(actionButton("打开客厅 Agent · Demo") {
+            startActivity(Intent(this, AgentActivity::class.java))
+        }, matchWrap())
         instructions.addView(spacer(14))
 
         serverState = text("", 18f, 0xFF76E7AC.toInt(), true)

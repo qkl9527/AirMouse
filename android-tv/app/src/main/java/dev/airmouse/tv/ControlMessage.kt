@@ -6,6 +6,10 @@ import kotlin.math.min
 
 /** 经过校验后交给电视输入服务执行的操作，不把网络 JSON 直接传到系统输入 API。 */
 sealed interface RemoteAction {
+    // 仅由服务端在用户确认后构造；网络 JSON 解码器不接受这种包装命令。
+    data class AgentCommand(val action: RemoteAction, val requestId: String, val expectedPackage: String?, val allowed: () -> Boolean) : RemoteAction
+    data class AgentDrag(val dx: Float, val dy: Float) : RemoteAction
+    data class OpenAgent(val requestId: String) : RemoteAction
     data class Move(val dx: Float, val dy: Float) : RemoteAction
     data class Click(val count: Int) : RemoteAction
     data object DragStart : RemoteAction

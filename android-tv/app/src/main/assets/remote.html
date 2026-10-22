@@ -594,6 +594,7 @@
     socket = new WebSocket(`${scheme}//${location.host}/ws?token=${encodeURIComponent(token)}`);
     socket.onopen = () => {
       setConnected(true, '已连接电视');
+      window.dispatchEvent(new CustomEvent('airmouse-agent-message', { detail:{ type:'agent_connection', connected:true } }));
       partyIdentityReady = false;
       document.getElementById('enableAirButton').disabled = true;
       send({ type:'join', clientId:getClientId(), proof:clientProof });
@@ -601,7 +602,9 @@
       send({ type:'list_apps', requestId:appRequestId });
       send({ type:'cursor_style', style:feedbackPreferences.cursorStyle });
     };
-    socket.onclose = () => {
+    socket.onclose = event => {
+      // 仅传递关闭码供诊断；不回显服务器 reason 或任何 Key / 消息内容。
+      window.dispatchEvent(new CustomEvent('airmouse-agent-message', { detail:{ type:'agent_connection', connected:false, closeCode:event.code } }));
       cancelKeyboardSend('电视连接已断开，未确认的文字可从手机找回。');
       keyboardProtocol = null;
       setConnected(false, '电视连接断开，正在重连…');
@@ -614,6 +617,7 @@
     socket.onmessage = event => {
       try {
         const message = JSON.parse(event.data);
+        if (message.type.startsWith('agent_') || message.type === 'action_result') window.dispatchEvent(new CustomEvent('airmouse-agent-message', { detail:message }));
         if (message.type === 'status' && message.connected) {
           setConnected(true, '已连接电视');
           keyboardProtocol = Number.isInteger(message.keyboardProtocol) ? message.keyboardProtocol : 0;
@@ -647,6 +651,12 @@
     socket.send(JSON.stringify(message));
     return true;
   }
+
+  // Agent 独立模块只使用发送与切页入口，不直接接触配对凭据。
+  window.airmouseAgentTransport = {
+    send, showPanel, connected:() => socket?.readyState === WebSocket.OPEN, clientId:getClientId,
+    context:() => ({scenes:loadScenes(),shortcuts:[...document.getElementById('shortcutSelects').children].map(item=>item.value)})
+  };
 
   function showPanel(name) {
     document.querySelectorAll('[data-view]').forEach(view => view.classList.toggle('active', view.dataset.view === name));
@@ -1555,6 +1565,17 @@
   renderAirMode();
   const initialPanel = new URLSearchParams(location.search).get('panel');
   showPanel(['remote','scenes','play','settings'].includes(initialPanel) ? initialPanel : 'remote');
+})();
+</script>
+<script>
+// 静态资源沿用当前配对参数；file 预览也能直接加载相邻资源。
+(() => {
+  const css = document.createElement('link'); css.rel = 'stylesheet'; css.href = 'agent-phone.css' + location.search; document.head.append(css);
+  const renderer = document.createElement('script'); renderer.src = 'agent-conversation.js' + location.search;
+  renderer.onload = () => {
+    const script = document.createElement('script'); script.src = 'agent-phone.js' + location.search; document.body.append(script);
+  };
+  document.body.append(renderer);
 })();
 </script>
 </body>

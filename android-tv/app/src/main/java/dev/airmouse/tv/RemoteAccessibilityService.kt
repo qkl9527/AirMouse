@@ -70,27 +70,49 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
 
     override fun onAction(action: RemoteAction) {
         mainHandler.post {
-            if (action is RemoteAction.Text || action is RemoteAction.SceneText ||
-                (action is RemoteAction.Key && action.name in editorKeys)
-            ) {
-                // IME 生命周期在主线程捕获；远程文本查询/无障碍 API 可能等待数秒，
-                // 交给独立串行队列，避免拖住光标绘制、IME 回调和后续输入。
-                val session = RemoteInputBridge.captureSession()
-                editorWorker?.execute {
-                    runCatching { dispatch(action, session) }.onFailure { error ->
-                        Log.w("AirMouseInput", "电视编辑命令执行失败", error)
-                        val requestId = when (action) {
-                            is RemoteAction.Text -> action.requestId
-                            is RemoteAction.Key -> action.requestId
-                            is RemoteAction.SceneText -> action.requestId
-                            else -> null
-                        }
-                        if (requestId != null) ControlServer.notifyActionResult(requestId, false, editorUnavailableMessage)
-                        else reportEditorUnavailable()
+            val approved = action as? RemoteAction.AgentCommand
+            val actual = approved?.action ?: action
+            // 在真正执行的线程再次检查授权代次和目标 App，取消/超时后排队的命令不能迟到执行。
+            fun execute(editor: RemoteEditorSession? = null) {
+                if (approved != null && (!approved.allowed() ||
+                        (approved.expectedPackage != null && foregroundPackage() != approved.expectedPackage))) {
+                    ControlServer.notifyActionResult(approved.requestId, false, "操作已取消或电视前台应用已改变，请重新发起。"); return
+                }
+                runCatching { dispatch(actual, editor) }.onFailure { error ->
+                    Log.w("AirMouseInput", "电视命令执行失败", error)
+                    val id = approved?.requestId ?: when (actual) {
+                        is RemoteAction.Text -> actual.requestId
+                        is RemoteAction.Key -> actual.requestId
+                        is RemoteAction.SceneText -> actual.requestId
+                        else -> null
+                    }
+                    if (id != null) ControlServer.notifyActionResult(id, false, editorUnavailableMessage)
+                    else reportEditorUnavailable()
+                }.onSuccess {
+                    // Key/Text/LaunchApp/SceneText 自身有真实回执，指针动作只确认已派发。
+                    if (approved != null && actual !is RemoteAction.Key && actual !is RemoteAction.Text &&
+                        actual !is RemoteAction.LaunchApp && actual !is RemoteAction.SceneText) {
+                        ControlServer.notifyActionResult(approved.requestId, true, "操作已派发，界面效果需以电视实际显示为准。")
                     }
                 }
-            } else dispatch(action)
+            }
+            if (actual is RemoteAction.Text || actual is RemoteAction.SceneText ||
+                (actual is RemoteAction.Key && actual.name in editorKeys)) {
+                val session = RemoteInputBridge.captureSession()
+                val worker = editorWorker
+                if (worker != null) worker.execute { execute(session) }
+                else if (approved != null) ControlServer.notifyActionResult(approved.requestId, false, editorUnavailableMessage)
+            } else execute()
         }
+    }
+
+    override fun foregroundPackage(): String? {
+        val root = rootInActiveWindow ?: return null
+        return try { root.packageName?.toString() } finally { root.recycle() }
+    }
+
+    override fun onAgentApproval(state: org.json.JSONObject?) {
+        mainHandler.post { overlay.updateAgentApproval(state) }
     }
 
     override fun onClientCountChanged(count: Int) {
@@ -107,6 +129,17 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
 
     private fun dispatch(action: RemoteAction, editor: RemoteEditorSession? = null) {
         when (action) {
+            is RemoteAction.AgentCommand -> Unit // 包装命令只在 onAction 的授权门中解包。
+            is RemoteAction.AgentDrag -> { startDrag(); movePointer(action.dx, action.dy); finishDrag() }
+            is RemoteAction.OpenAgent -> {
+                runCatching {
+                    startActivity(android.content.Intent(this, AgentActivity::class.java)
+                        .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK or android.content.Intent.FLAG_ACTIVITY_REORDER_TO_FRONT))
+                }.onFailure {
+                    ControlServer.notifyActionResult(action.requestId, false, "电视系统阻止打开 Agent，请从 AirMouse 主页面打开。")
+                }
+                // 成功状态由 Activity.onResume 确认，避免把 startActivity 返回误报成已上屏。
+            }
             is RemoteAction.Move -> movePointer(action.dx, action.dy)
             is RemoteAction.Click -> click(action.count)
             RemoteAction.DragStart -> startDrag()
@@ -133,7 +166,8 @@ class RemoteAccessibilityService : AccessibilityService(), ControlServer.Listene
     }
 
     private fun launchApp(action: RemoteAction.LaunchApp) {
-        val launchIntent = packageManager.getLaunchIntentForPackage(action.packageName)
+        val launchIntent = packageManager.getLeanbackLaunchIntentForPackage(action.packageName)
+            ?: packageManager.getLaunchIntentForPackage(action.packageName)
         if (launchIntent == null) {
             ControlServer.notifyActionResult(action.requestId, false, "电视上找不到这个可启动的 App。")
             return
