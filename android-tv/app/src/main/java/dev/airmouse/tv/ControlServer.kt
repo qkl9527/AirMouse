@@ -42,6 +42,7 @@ import javax.net.ssl.SSLSocket
  * 其他网页利用浏览器跨站发起控制连接的机会。服务只绑定本地网络，不开放云端中继。
  */
 object ControlServer {
+    fun connectedPhoneCount(): Int = clientOutputs.size
     private val modelListing = java.util.concurrent.atomic.AtomicBoolean(false)
     private const val DEFAULT_PORT = 8765
     private const val DEFAULT_HTTPS_PORT = 8766
@@ -303,6 +304,8 @@ object ControlServer {
                     countedAsClient = true
                     writeWebSocketUpgrade(output, webSocketAccept)
             if (!activateClient(socket, output, generation)) return
+                    AgentDiagnostics.event("phone", "connected", "controllers=${connectedPhoneCount()}")
+                    AgentSession.refreshConnectionState()
                     writeTextFrame(output, "{\"type\":\"status\",\"connected\":true,\"keyboardProtocol\":3}")
                     writeTextFrame(output, AgentSession.snapshot().toString())
                     readWebSocketMessages(socket, input, output)
@@ -319,6 +322,10 @@ object ControlServer {
         } finally {
             runCatching { socket.close() }
             unregisterClient(socket, generation, countedAsClient)
+            if (countedAsClient && generation == serverGeneration) {
+                AgentDiagnostics.event("phone", "disconnected", "controllers=${connectedPhoneCount()}")
+                AgentSession.refreshConnectionState()
+            }
         }
     }
 
@@ -602,6 +609,12 @@ object ControlServer {
     private fun handleAgentMessage(json: JSONObject, output: DataOutputStream, socket: Socket) {
         val id = json.optString("requestId")
         if (!id.matches(Regex("[A-Za-z0-9_-]{1,96}"))) return
+        if (json.optString("type") == "agent_debug_get") {
+            val result = JSONObject().put("type", "agent_result").put("requestId", id).put("ok", true)
+                .put("data", AgentDiagnostics.snapshot())
+            writeTextFrame(output, result.toString())
+            return
+        }
         if(json.optString("type")=="agent_provider_models") {
             // 读取模型列表可能较慢，不能占住遥控 WebSocket 接收循环。
             if(!modelListing.compareAndSet(false,true)) {
@@ -627,6 +640,12 @@ object ControlServer {
             return
         }
         val error = when (json.optString("type")) {
+            "agent_access_mode" -> AgentSession.setAccessMode(json.optString("value"), json.optString("expectedMode"))
+            "agent_debug" -> {
+                val value = json.opt("enabled")
+                if (value !is Boolean) "调试开关参数无效。"
+                else AgentDiagnostics.setEnabled(value).also { if (it == null) AgentSession.refreshConnectionState() }
+            }
             "agent_configure" -> "模型配置已升级为多提供商，请刷新手机网页后配置。"
             "agent_text_size" -> {
                 val value=json.opt("value")

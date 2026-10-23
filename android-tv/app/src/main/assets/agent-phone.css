@@ -59,3 +59,16 @@
 .agent-shared-settings{border-top:1px solid #deded8;margin-top:24px;padding-top:12px}.agent-modal .provider-mobile-picker{display:none}
 .agent-head p,.agent-foot p{overflow-wrap:anywhere}.agent-head>div{min-width:0}
 @media(max-width:700px){.provider-layout{grid-template-columns:minmax(0,1fr);gap:22px}.provider-sidebar{border:0;padding:0;display:grid;grid-template-columns:1fr auto;gap:0 12px}.provider-sidebar-title{grid-column:1/-1;margin:0}.provider-list{display:none}.agent-modal .provider-mobile-picker{display:block;grid-column:1/-1}.provider-sidebar>label:not(.provider-mobile-picker){min-width:0;margin-top:12px}.provider-sidebar>button{align-self:end;width:auto;margin-bottom:0;padding:0 12px}.provider-field-grid{grid-template-columns:minmax(0,1fr)}.provider-editor-head>div{min-width:0}.provider-editor-head h3{overflow-wrap:anywhere;font-size:21px}.provider-model-card{padding:12px}.provider-save-bar{bottom:-20px}.provider-model-head>div{width:100%}.provider-model-head button{flex:1}.provider-save-bar span{max-width:55%}}
+
+/* 诊断报告只显示脱敏元数据，长行不能把手机配置面板撑宽。 */
+.agent-debug-report{display:block;width:100%;min-width:0;max-width:100%;height:240px;resize:vertical;margin-top:12px;font:12px/1.6 monospace;white-space:pre-wrap;overflow-wrap:anywhere;color:#18221a;background:#eeeee8;border:1px solid #deded8;border-radius:10px;padding:12px}
+
+.agent-head{flex-wrap:wrap}.agent-head-actions{display:flex;gap:8px;flex:none}.agent-head-actions button{padding:0 12px}
+
+/* 权限始终显示在输入区，完全访问有明确标记；选择后需用户保存才生效。 */
+.agent-dock-toolbar .agent-access-chip{font-size:12px;padding:4px 10px;border:1px solid #c9ccc4;background:#f4f4ee;color:#354137;border-radius:999px}
+.agent-dock-toolbar .agent-access-chip[data-mode="full"]{border-color:#b1894b;background:#f9edda;color:#76501d}
+.agent-access-options{border:0;margin:20px 0;padding:0;min-width:0}.agent-access-options legend{font-size:14px;font-weight:600}
+.agent-modal .agent-access-option{display:flex;gap:12px;align-items:flex-start;padding:16px;border:1px solid #ccd0c6;border-radius:12px;margin-top:12px;cursor:pointer}
+.agent-access-option input{width:18px;height:18px;margin:3px 0 0;padding:0;flex:none;accent-color:#325b38}.agent-access-option span{min-width:0}.agent-access-option strong{font-size:15px}.agent-access-option small{display:block;font-size:13px;line-height:1.7;color:#62695d;margin-top:8px}
+#agentSaveAccess{width:100%;min-height:44px}

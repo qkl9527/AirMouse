@@ -30,6 +30,7 @@ object AgentModelClient {
     }
     private fun status(http:HttpURLConnection){
         val code=http.responseCode
+        AgentDiagnostics.event("model", "http_status", "code=$code", code !in 200..299)
         check(code in 200..299,when(code){
             401,403->"提供商拒绝访问，请检查该提供商的 Key、地域和模型权限。"
             404->"接口或模型不存在，请检查服务地址、协议和模型 ID。"
@@ -57,6 +58,7 @@ object AgentModelClient {
     }
     fun request(config:AgentConfiguration.Value,chat:JSONArray,stream:Boolean,allowTools:Boolean,withTools:Boolean,
         onPartial:(String)->Unit,onConnection:(HttpURLConnection)->Unit,checkActive:()->Unit):Reply {
+        AgentDiagnostics.event("model", "request", "protocol=${config.protocol} stream=$stream tools=${withTools && config.toolsEnabled}")
         val body=body(config,chat,stream,allowTools,withTools).toString().toByteArray(Charsets.UTF_8)
         val http=URL(endpoint(config)).openConnection() as HttpURLConnection
         try {

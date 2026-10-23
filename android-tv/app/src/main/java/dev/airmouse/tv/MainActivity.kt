@@ -39,6 +39,7 @@ class MainActivity : Activity() {
 
     override fun onCreate(savedInstanceState: android.os.Bundle?) {
         super.onCreate(savedInstanceState)
+        AgentDiagnostics.initialize(this)
         buildHomeScreen()
     }
 
@@ -96,9 +97,18 @@ class MainActivity : Activity() {
         instructions.addView(actionButton(getString(R.string.enable_input_method)) {
             openSystemSettings(Settings.ACTION_INPUT_METHOD_SETTINGS)
         }, matchWrap())
-        instructions.addView(actionButton("打开客厅 Agent · Demo") {
+        instructions.addView(actionButton("打开客厅 Agent") {
             startActivity(Intent(this, AgentActivity::class.java))
         }, matchWrap())
+        val debugButton = actionButton("") {}
+        fun updateDebugLabel() { debugButton.text = "Agent Debug · ${if (AgentDiagnostics.enabled) "已开启（点击关闭）" else "已关闭（点击开启）"}" }
+        updateDebugLabel()
+        debugButton.setOnClickListener {
+            AgentDiagnostics.setEnabled(!AgentDiagnostics.enabled)
+            AgentSession.refreshConnectionState()
+            updateDebugLabel()
+        }
+        instructions.addView(debugButton, matchWrap())
         instructions.addView(spacer(14))
 
         serverState = text("", 18f, 0xFF76E7AC.toInt(), true)

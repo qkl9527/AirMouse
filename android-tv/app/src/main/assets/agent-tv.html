@@ -5,12 +5,31 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
 <title>AirMouse · Agent</title>
 <style>
-:root{color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f9f8f6;color:#101010}*{box-sizing:border-box}body{margin:0}aside{position:fixed;inset:0 auto 0 0;width:27%;padding:5vh 3.5vw;background:#0a0a0a;color:white;display:flex;flex-direction:column;justify-content:space-between}.brand{font-size:clamp(16px,1.8vw,30px);letter-spacing:.04em}.orb{width:clamp(70px,9vw,150px);height:clamp(70px,9vw,150px);border:1px solid #737373;border-radius:50%;display:grid;place-items:center;margin:9vh 0 4vh}.orb svg{width:50%;height:50%}h1{font-size:clamp(28px,3.5vw,66px);font-weight:450;letter-spacing:-.04em;line-height:1.2;margin:0 0 20px}aside p{font-size:clamp(15px,1.45vw,26px);color:#b9b9b9;line-height:1.6}.model{border-top:1px solid #454545;padding-top:24px;font-size:clamp(13px,1.15vw,22px);line-height:1.8;color:#aaa}.model strong{display:block;color:#fff;font-weight:500}main{margin-left:27%;padding:5vh 5vw 6vh;min-height:100vh}header{display:flex;gap:16px;align-items:center;justify-content:space-between;border-bottom:1px solid #deded8;padding-bottom:24px;font-size:clamp(16px,1.4vw,26px)}#status{color:#5b5e59}#empty{padding:12vh 0 0;max-width:850px}#empty h2{font-size:clamp(34px,4vw,72px);font-weight:450;line-height:1.2;letter-spacing:-.05em;margin:0 0 24px}#empty p{font-size:clamp(18px,1.8vw,32px);color:#60625f;line-height:1.7}.suggestion{margin-top:48px;border-top:1px solid #deded8;padding-top:24px;font-size:clamp(17px,1.6vw,28px);line-height:1.8}.message{padding:30px 0;border-bottom:1px solid #deded8;overflow-wrap:anywhere}.role{font-size:clamp(13px,1.15vw,22px);letter-spacing:.04em;color:#5d625b;margin-bottom:16px}.copy{white-space:pre-wrap;font-size:var(--agent-text-size,28px);line-height:1.7;max-width:1200px}.user .copy{font-size:calc(var(--agent-text-size,28px) * .85);color:#4d514b}.message img{display:block;max-width:100%;max-height:34vh;border-radius:12px;margin-top:20px;object-fit:contain;object-position:left}.image-label{font-size:18px;color:#656960;margin-top:12px}#pending,#error{font-size:clamp(18px,1.6vw,28px);line-height:1.6;margin-top:28px}#error{color:#9d361c}#pending::before{content:'';display:inline-block;width:12px;height:12px;background:#252c25;border-radius:50%;margin-right:12px;animation:breathe 1.5s infinite}@keyframes breathe{50%{opacity:.25}}[hidden]{display:none!important}@media(prefers-reduced-motion:reduce){#pending::before{animation:none}}@media(max-width:650px){aside{position:relative;width:100%;padding:24px;flex-direction:row;align-items:center;gap:16px}.identity{display:none}.model{border:0;padding:0;font-size:12px}.brand{font-size:17px}main{margin-left:0;padding:24px}#empty{padding-top:48px}.copy{font-size:var(--agent-text-size,28px)}header{font-size:14px}.message{padding:24px 0}}
+:root{color-scheme:light;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#f9f8f6;color:#101010}*{box-sizing:border-box}body{margin:0}aside{position:fixed;top:0;bottom:0;left:0;height:100vh;overflow:auto;width:27%;padding:5vh 3.5vw;background:#0a0a0a;color:white;display:flex;flex-direction:column;justify-content:space-between}.brand{font-size:20px;font-size:clamp(16px,1.8vw,30px);letter-spacing:.04em}.orb{width:9vw;height:9vw;min-width:70px;min-height:70px;max-width:150px;max-height:150px;width:clamp(70px,9vw,150px);height:clamp(70px,9vw,150px);border:1px solid #737373;border-radius:50%;display:grid;place-items:center;margin:9vh 0 4vh}.orb svg{width:50%;height:50%}h1{font-size:32px;font-size:clamp(28px,3.5vw,66px);font-weight:450;letter-spacing:-.04em;line-height:1.2;margin:0 0 20px}aside p{font-size:17px;font-size:clamp(15px,1.45vw,26px);color:#b9b9b9;line-height:1.6}.model{border-top:1px solid #454545;padding-top:24px;font-size:14px;font-size:clamp(13px,1.15vw,22px);line-height:1.8;color:#aaa}.model strong{overflow-wrap:break-word;word-break:break-word;display:block;color:#fff;font-weight:500}main{margin-left:27%;padding:5vh 5vw 6vh;min-height:100vh}header{display:flex;gap:16px;align-items:center;justify-content:space-between;border-bottom:1px solid #deded8;padding-bottom:24px;font-size:18px;font-size:clamp(16px,1.4vw,26px)}#status{color:#5b5e59}#empty{padding:12vh 0 0;max-width:850px}#empty h2{font-size:38px;font-size:clamp(34px,4vw,72px);font-weight:450;line-height:1.2;letter-spacing:-.05em;margin:0 0 24px}#empty p{font-size:20px;font-size:clamp(18px,1.8vw,32px);color:#60625f;line-height:1.7}.suggestion{margin-top:48px;border-top:1px solid #deded8;padding-top:24px;font-size:20px;font-size:clamp(17px,1.6vw,28px);line-height:1.8}.message{padding:30px 0;border-bottom:1px solid #deded8;overflow-wrap:break-word;word-wrap:break-word;overflow-wrap:anywhere}.role{font-size:14px;font-size:clamp(13px,1.15vw,22px);letter-spacing:.04em;color:#5d625b;margin-bottom:16px}.copy{white-space:pre-wrap;font-size:var(--agent-text-size,28px);line-height:1.7;max-width:1200px}.user .copy{font-size:calc(var(--agent-text-size,28px) * .85);color:#4d514b}.message img{display:block;max-width:100%;max-height:34vh;border-radius:12px;margin-top:20px;object-fit:contain;object-position:left}.image-label{font-size:18px;color:#656960;margin-top:12px}#pending,#error{font-size:20px;font-size:clamp(18px,1.6vw,28px);line-height:1.6;margin-top:28px}#error{color:#9d361c}#pending::before{content:'';display:inline-block;width:12px;height:12px;background:#252c25;border-radius:50%;margin-right:12px;animation:breathe 1.5s infinite}@keyframes breathe{50%{opacity:.25}}[hidden]{display:none!important}@media(prefers-reduced-motion:reduce){#pending::before{animation:none}}@media(max-width:650px){aside{position:relative;top:auto;bottom:auto;left:auto;height:auto;overflow:visible;width:100%;padding:24px;flex-direction:row;align-items:center;gap:16px}.identity{display:none}.model{border:0;padding:0;font-size:12px}.brand{font-size:17px}main{margin-left:0;padding:24px}#empty{padding-top:48px}.copy{font-size:var(--agent-text-size,28px)}header{font-size:14px}.message{padding:24px 0}}
+@media(max-height:600px) and (min-width:651px){.orb{display:none}aside{padding-top:24px;padding-bottom:24px}.model{padding-top:14px}#empty{padding-top:7vh}.suggestion{margin-top:24px}}
+header>span:first-child{min-width:0;overflow-wrap:break-word}#status{flex-shrink:0;margin-left:16px;text-align:right}
 .agent-writing .copy::after{content:"";display:inline-block;width:2px;height:1em;margin-left:4px;vertical-align:-3px;background:currentColor}
 </style></head>
 <body>
-<aside><div class="brand">AirMouse / AGENT</div><div class="identity"><div class="orb"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M20 2v36M2 20h36M7 7l26 26M7 33L33 7"/><circle cx="20" cy="20" r="11"/></svg></div><h1>小屏提问。<br>大屏想象。</h1><p>把问题留在手机，<br>把答案交给客厅。</p></div><div class="model"><strong id="modelName">选择提供商和模型</strong>上下键翻阅 · 返回键退出</div></aside>
-<main><header><span>客厅对话</span><span id="status" role="status">等待手机连接</span></header><section id="empty"><h2>今天，聊点什么？</h2><p>在手机的 Agent 页面输入问题，<br>也可以发来一张图片，一起看懂它。</p><div class="suggestion">一张旅行照片，一道晚餐灵感，<br>或一个一直想问的问题。</div></section><div id="messages"></div><p id="pending" hidden>模型正在思考，请稍候…</p><p id="error" role="alert" hidden></p></main>
+<aside><div class="brand">AirMouse / AGENT</div><div class="identity"><div class="orb"><svg viewBox="0 0 40 40" fill="none" stroke="currentColor" stroke-width="1.2" aria-hidden="true"><path d="M20 2v36M2 20h36M7 7l26 26M7 33L33 7"/><circle cx="20" cy="20" r="11"/></svg></div><h1>小屏提问。<br>大屏想象。</h1><p>把问题留在手机，<br>把答案交给客厅。</p></div><div class="model"><strong id="modelName">选择提供商和模型</strong><span id="accessMode">待批准模式</span><br>上下键翻阅 · 返回键退出</div></aside>
+<main><header><span>客厅对话</span><span id="status" role="status">正在加载电视会话…</span></header><section id="empty"><h2>今天，聊点什么？</h2><p>在手机的 Agent 页面输入问题，<br>也可以发来一张图片，一起看懂它。</p><div class="suggestion">一张旅行照片，一道晚餐灵感，<br>或一个一直想问的问题。</div></section><div id="messages"></div><p id="pending" hidden>模型正在思考，请稍候…</p><p id="error" role="alert" hidden></p></main>
+<script>
+// 此段只用旧版 WebView 可解析的语法，在主脚本解析失败时也能报告错误。
+(function () {
+  window.agentReportError = function (message) {
+    var status = document.getElementById('status');
+    var error = document.getElementById('error');
+    if (status) status.textContent = '电视页面异常 · 请查看 Debug';
+    if (error) { error.hidden = false; error.textContent = '电视页面初始化或更新失败，可从 AirMouse 首页开启 Agent Debug 查看详情。'; }
+    try { if (window.AirMouseAgent) window.AirMouseAgent.error(String(message).slice(0, 600)); } catch (ignored) {}
+  };
+  window.onerror = function (message, source, line) { window.agentReportError(String(message) + ' line=' + line); };
+  window.addEventListener('error', function (event) {
+    if (event.target && event.target.tagName === 'SCRIPT') window.agentReportError('built-in script failed to load');
+  }, true);
+  window.onunhandledrejection = function (event) { window.agentReportError(event.reason && event.reason.message || 'unhandled promise rejection'); };
+})();
+</script>
 <script src="agent-conversation.js"></script>
 <script>
 (() => {
@@ -23,12 +42,14 @@
    if (state.revision < revision) return;
    revision=state.revision;
    document.getElementById('modelName').textContent=state.model?`${state.providerName} / ${state.model}`:'请选择提供商和模型';
-   if(state.session?.id!==sessionId){conversation.reset();sessionId=state.session?.id;}
+   document.getElementById('accessMode').textContent=state.accessMode==='full'?'完全访问 · 直接执行':'待批准 · 逐次确认';
+   const currentSession=state.session || {};
+   if(currentSession.id!==sessionId){conversation.reset();sessionId=currentSession.id;}
    const heading=document.querySelector('main header>span:first-child');
-   heading.textContent=(state.session?.temporary?'一次性 · ':'')+(state.session?.title || '客厅对话');
+   heading.textContent=(currentSession.temporary?'一次性 · ':'')+(currentSession.title || '客厅对话');
    const size=state.configuration && state.configuration.textSize;
    if(Number.isInteger(size) && size>=12 && size<=48)document.documentElement.style.setProperty('--agent-text-size',size+'px');
-   document.getElementById('status').textContent=state.compacting?'正在压缩历史记忆':state.approval?(state.approval.phase==='pending'?'等待手机确认操作':'正在执行操作'):state.busy?'正在回答':state.configured?'已就绪 · 从手机发来问题':'请在手机配置模型';
+   document.getElementById('status').textContent=state.compacting?'正在压缩历史记忆':state.approval?(state.approval.phase==='pending'?'等待手机确认操作':'正在执行操作'):state.busy?'正在回答':!(state.connectedPhones>0)?'等待手机连接':state.configured?'已连接 '+state.connectedPhones+' 台手机 · 已就绪':'手机已连接 · 请配置模型';
    document.getElementById('pending').hidden=!state.busy;
    document.getElementById('pending').textContent=state.compacting?'上下文已达 80%，正在整理记忆，随后继续…':state.messages && state.messages.length && state.messages[state.messages.length-1].role==='assistant'?'模型正在回答…':'模型正在思考，请稍候…';
    document.getElementById('error').hidden=!state.error;
@@ -42,8 +63,14 @@
      if(latestAnswerRequest!==null && request>latestAnswerRequest)conversation.latest();
      latestAnswerRequest=request;
    }
+   if(window.AirMouseAgent)window.AirMouseAgent.rendered(revision,window.innerWidth,window.innerHeight);
  };
- function refresh(){try{if(window.AirMouseAgent){const raw=window.AirMouseAgent.state(revision);if(raw)window.renderAgentState(JSON.parse(raw));}}catch(_){} }
+ if(window.AirMouseAgent)window.AirMouseAgent.ready();
+ window.addEventListener('resize',()=>{
+   conversation.layout();
+   if(window.AirMouseAgent)window.AirMouseAgent.rendered(revision,window.innerWidth,window.innerHeight);
+ });
+ function refresh(){try{if(window.AirMouseAgent){const raw=window.AirMouseAgent.state(revision);if(raw)window.renderAgentState(JSON.parse(raw));}}catch(error){window.agentReportError(error && error.message || 'state bridge failed');} }
  refresh();setInterval(refresh,200);
 })();
 </script></body></html>

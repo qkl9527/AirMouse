@@ -35,13 +35,15 @@ object AgentSession {
     private var latestAnswerRequest = 0L
     private var visible = false
     private var streaming = true
+    // TV 是权限模式的唯一来源；不存在或无效的存储值始终回到逐次批准。
+    private var accessMode = "approval"
     private var responseStreaming = true
     private var connection: HttpURLConnection? = null
     private data class Approval(val id: String, val owner: String, val job: Long, val plan: AgentTools.Plan,
         val expiresAt: Long, val decision: CompletableFuture<Boolean> = CompletableFuture(), var phase: String = "pending",
-        val auditId: String = "operation-${UUID.randomUUID()}", val function: String = "") {
+        val auditId: String = "operation-${UUID.randomUUID()}", val function: String = "", val automatic: Boolean = false) {
         fun json() = JSONObject().put("id", id).put("owner", owner).put("title", plan.title)
-            .put("steps", plan.descriptions()).put("expiresAt", expiresAt).put("phase", phase)
+            .put("steps", plan.descriptions()).put("expiresAt", expiresAt).put("phase", phase).put("automatic", automatic)
     }
     private var approval: Approval? = null
     @Volatile var onApprovalChanged: ((JSONObject?) -> Unit)? = null
@@ -50,6 +52,7 @@ object AgentSession {
     @Volatile var onDelta: ((JSONObject) -> Unit)? = null
 
     fun initialize(context: Context) {
+        AgentDiagnostics.initialize(context)
         synchronized(lock) {
             appContext = context.applicationContext
             if(historyStore == null) {
@@ -64,6 +67,8 @@ object AgentSession {
             apiKey = configuration.key
             streaming = context.getSharedPreferences("agent-preferences", Context.MODE_PRIVATE)
                 .getBoolean("streaming", true)
+            accessMode = context.getSharedPreferences("agent-preferences", Context.MODE_PRIVATE)
+                .getString("accessMode", "approval").takeIf { it in setOf("approval", "full") } ?: "approval"
         }
     }
 
@@ -81,10 +86,13 @@ object AgentSession {
             .put("tvVisible", visible).put("revision", revision)
             .put("latestAnswerRequest", latestAnswerRequest)
             .put("streaming", streaming)
+            .put("accessMode", accessMode)
             .put("responseStreaming", responseStreaming)
             .put("approval", approval?.json() ?: JSONObject.NULL)
             .put("configuration", AgentConfiguration.publicJson(configuration))
             .put("providerSettings",providerStore?.publicState() ?: JSONObject())
+            .put("connectedPhones", ControlServer.connectedPhoneCount())
+            .put("diagnostics", AgentDiagnostics.summary())
             .put("session", session.metadata()).put("sessions", historyStore?.list() ?: JSONArray())
             .put("compacting", compacting).put("contextNotice", contextNotice)
             .put("contextEstimate", contextEstimate).put("storageWarning", storageWarning)
@@ -96,6 +104,25 @@ object AgentSession {
     }
 
     private fun changed() { synchronized(lock) { revision++ }; onChanged?.invoke() }
+
+    /** 连接或调试开关变化同样推动 revision，电视不会停留在旧的连接提示。 */
+    fun refreshConnectionState() { changed() }
+
+    /** 只在空闲时切换，不能通过改变设置批准正在等待的操作或影响已开始的一轮执行。 */
+    fun setAccessMode(value: String, expected: String): String? {
+        synchronized(lock) {
+            if (value !in setOf("approval", "full")) return "操作权限模式无效。"
+            if (expected != accessMode) return "权限模式已由其他手机修改，请核对当前设置后重试。"
+            if (busy) return "请先停止当前回答或等待操作完成，再切换操作权限。"
+            val context = appContext ?: return "电视服务尚未启动。"
+            if (!context.getSharedPreferences("agent-preferences", Context.MODE_PRIVATE).edit().putString("accessMode", value).commit())
+                return "电视无法保存操作权限。"
+            accessMode = value
+        }
+        AgentDiagnostics.event("agent", "access_mode", value)
+        changed()
+        return null
+    }
 
     /** 不在流式每个分片落盘；收件、操作结果、回答结束、停止和切换时保存。 */
     private fun saveSessionLocked() {
@@ -273,6 +300,8 @@ object AgentSession {
                 connection = null
                 approval = null
                 result.onFailure { failure ->
+                    // 只记录异常类型，不能把模型原始响应、用户内容或认证信息写入调试事件。
+                    AgentDiagnostics.event("model", "turn_failed", failure.javaClass.simpleName, true)
                     error = when (failure) {
                         is AgentFailure -> failure.message.orEmpty()
                         is java.net.SocketTimeoutException -> "模型响应超时，已收到的内容保留。请检查电视网络。"
@@ -308,7 +337,7 @@ object AgentSession {
 
     private fun buildChat(history: JSONArray, context: JSONObject): JSONArray {
         val chat = JSONArray().put(JSONObject().put("role", "system").put("content",
-            AgentTools.systemPrompt(context)))
+            AgentTools.systemPrompt(context, synchronized(lock) { accessMode == "full" })))
         val memory = synchronized(lock) { session.summary to session.summaryCount }
         if(memory.first.isNotEmpty()) chat.put(memoryMessage(memory.first))
         for (index in memory.second until history.length()) {
@@ -393,19 +422,21 @@ object AgentSession {
     }
 
     private fun approveAndExecute(job: Long, owner: String, plan: AgentTools.Plan, function: JSONObject): JSONObject {
+        val automatic = synchronized(lock) { accessMode == "full" }
         val pending = Approval(UUID.randomUUID().toString(), owner, job, plan, System.currentTimeMillis() + 120_000,
-            function=function.toString())
+            phase=if (automatic) "executing" else "pending", function=function.toString(), automatic=automatic)
         synchronized(lock) {
             if (job != generation) throw AgentFailure("已停止")
             approval = pending
             // 确认前先留下操作意图，崩溃或停止后也不会把“准备执行”误记成“已经完成”。
-            updateAuditLocked(pending, "等待用户确认，尚未执行。")
+            updateAuditLocked(pending, if (automatic) "完全访问模式授权，操作执行中，最终结果尚未确认。" else "等待用户确认，尚未执行。")
         }
-        onApprovalChanged?.invoke(pending.json())
+        // 完全访问复用执行和审计流程，但不发审批浮层，也不等待 Future 或手机确认。
+        if (!automatic) onApprovalChanged?.invoke(pending.json())
         changed()
-        val allowed = try { pending.decision.get(120, TimeUnit.SECONDS) } catch (_: Exception) { false }
+        val allowed = automatic || try { pending.decision.get(120, TimeUnit.SECONDS) } catch (_: Exception) { false }
         synchronized(lock) { if (job != generation) throw AgentFailure("已停止") }
-        onApprovalChanged?.invoke(null)
+        if (!automatic) onApprovalChanged?.invoke(null)
         val output = if (!allowed) {
             AgentTools.result("denied", "用户拒绝或确认已超时，未执行该操作。请继续文字回复，不要再请求本轮工具。")
         } else AgentTools.execute(plan, owner) {
@@ -413,8 +444,9 @@ object AgentSession {
         }
         synchronized(lock) {
             if(job != generation) throw AgentFailure("已停止")
-            updateAuditLocked(pending, "确认：${if(allowed) "允许" else "拒绝或超时"}；结果：$output",
-                "${if(allowed) "已允许" else "拒绝或超时"} · ${output.optString("message")}")
+            val authorization = if (automatic) "完全访问模式" else if (allowed) "用户允许" else "拒绝或超时"
+            updateAuditLocked(pending, "授权方式：$authorization；结果：$output",
+                "$authorization · ${output.optString("message")}")
             if (approval === pending) approval = null
         }
         changed()
