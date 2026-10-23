@@ -13,8 +13,9 @@ import javax.crypto.spec.GCMParameterSpec
 
 /** TV 是唯一配置源。普通偏好持久化，API Key 仅以 Keystore 保护的 AES-GCM 密文保存。 */
 object AgentConfiguration {
+    const val DEFAULT_TEXT_SIZE = 18
     data class Value(val key: String = "", val contextTokens: Int = 32768, val maxTokens: Int = 2048,
-        val effort: String = "off", val textSize: Int = 28,
+        val effort: String = "off", val textSize: Int = DEFAULT_TEXT_SIZE,
         val providerId: String = "agnes", val providerName: String = "Agnes AI",
         val baseUrl: String = "https://apihub.agnes-ai.com/v1", val protocol: String = "chat",
         val family: String = "agnes", val modelId: String = "agnes-3.0-flash", val auth: String = "key",
@@ -54,7 +55,7 @@ object AgentConfiguration {
         val contextTokens=prefs.getInt("contextTokens",32768).coerceIn(4096,512000)
         return Value(key, contextTokens, prefs.getInt("maxTokens",2048).coerceIn(128,minOf(65536,contextTokens-1024)),
             prefs.getString("effort","off").orEmpty().takeIf { it in setOf("off","low","medium","high") } ?: "off",
-            prefs.getInt("textSize",28).coerceIn(12,48))
+            prefs.getInt("textSize",DEFAULT_TEXT_SIZE).coerceIn(12,48))
     }
     fun publicJson(value: Value)=JSONObject().put("contextTokens",value.contextTokens).put("maxTokens",value.maxTokens)
         .put("effort",value.effort).put("textSize",value.textSize).put("providerId",value.providerId)

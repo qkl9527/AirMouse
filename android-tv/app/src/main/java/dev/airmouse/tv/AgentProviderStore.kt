@@ -62,7 +62,7 @@ class AgentProviderStore(private val context: Context, legacy: AgentConfiguratio
         val m=(0 until models.length()).map {models.getJSONObject(it)}.find {it.optString("id")==data.optString("activeModel") && it.optBoolean("enabled")}
         return route(p,m,textSize)
     }
-    fun forModels(id: String): AgentConfiguration.Value = route(find(id) ?: error("提供商不存在，请先保存。"),null,28)
+    fun forModels(id: String): AgentConfiguration.Value = route(find(id) ?: error("提供商不存在，请先保存。"),null,AgentConfiguration.DEFAULT_TEXT_SIZE)
     private fun route(p: JSONObject,m: JSONObject?,size: Int)=AgentConfiguration.Value(
         key=p.optString("apiKey"),contextTokens=m?.optInt("contextTokens",32768) ?: 32768,
         maxTokens=m?.optInt("maxTokens",2048) ?: 2048,effort=m?.optString("effort","default") ?: "default",textSize=size,

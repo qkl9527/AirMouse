@@ -66,9 +66,12 @@
 .agent-head{flex-wrap:wrap}.agent-head-actions{display:flex;gap:8px;flex:none}.agent-head-actions button{padding:0 12px}
 
 /* 权限始终显示在输入区，完全访问有明确标记；选择后需用户保存才生效。 */
-.agent-dock-toolbar .agent-access-chip{font-size:12px;padding:4px 10px;border:1px solid #c9ccc4;background:#f4f4ee;color:#354137;border-radius:999px}
+.agent-dock-toolbar .agent-access-chip{height:36px;min-height:36px;font-size:12px;padding:0 10px;border:1px solid #c9ccc4;background:#f4f4ee;color:#354137;border-radius:999px}
 .agent-dock-toolbar .agent-access-chip[data-mode="full"]{border-color:#b1894b;background:#f9edda;color:#76501d}
 .agent-access-options{border:0;margin:20px 0;padding:0;min-width:0}.agent-access-options legend{font-size:14px;font-weight:600}
 .agent-modal .agent-access-option{display:flex;gap:12px;align-items:flex-start;padding:16px;border:1px solid #ccd0c6;border-radius:12px;margin-top:12px;cursor:pointer}
 .agent-access-option input{width:18px;height:18px;margin:3px 0 0;padding:0;flex:none;accent-color:#325b38}.agent-access-option span{min-width:0}.agent-access-option strong{font-size:15px}.agent-access-option small{display:block;font-size:13px;line-height:1.7;color:#62695d;margin-top:8px}
 #agentSaveAccess{width:100%;min-height:44px}
+
+/* 权限和附件按钮固定为 36px，覆盖通用按钮的 44/46px 最小高度。 */
+.agent-composer-dock .agent-compose-actions button{height:36px;min-height:36px;padding-top:0;padding-bottom:0;line-height:1.2}

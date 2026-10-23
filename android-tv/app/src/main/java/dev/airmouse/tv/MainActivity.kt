@@ -100,15 +100,6 @@ class MainActivity : Activity() {
         instructions.addView(actionButton("打开客厅 Agent") {
             startActivity(Intent(this, AgentActivity::class.java))
         }, matchWrap())
-        val debugButton = actionButton("") {}
-        fun updateDebugLabel() { debugButton.text = "Agent Debug · ${if (AgentDiagnostics.enabled) "已开启（点击关闭）" else "已关闭（点击开启）"}" }
-        updateDebugLabel()
-        debugButton.setOnClickListener {
-            AgentDiagnostics.setEnabled(!AgentDiagnostics.enabled)
-            AgentSession.refreshConnectionState()
-            updateDebugLabel()
-        }
-        instructions.addView(debugButton, matchWrap())
         instructions.addView(spacer(14))
 
         serverState = text("", 18f, 0xFF76E7AC.toInt(), true)

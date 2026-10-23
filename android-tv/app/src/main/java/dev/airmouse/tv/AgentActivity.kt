@@ -98,18 +98,10 @@ class AgentActivity : Activity() {
         debugPanel.addView(debugText)
         val buttons = LinearLayout(this)
         buttons.addView(Button(this).apply { text = "重新加载页面"; setOnClickListener { web.reload() } })
-        buttons.addView(Button(this).apply { text = "关闭 Debug"; setOnClickListener { toggleDebug(false) } })
         debugPanel.addView(buttons)
         root.addView(debugPanel, FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT, Gravity.BOTTOM))
         setContentView(root)
         web.loadUrl("file:///android_asset/agent-tv.html")
-    }
-
-    private fun toggleDebug(enabled: Boolean) {
-        AgentDiagnostics.setEnabled(enabled)
-        AgentSession.refreshConnectionState()
-        renderDiagnostics()
-        if (enabled) (debugPanel.getChildAt(1) as ViewGroup).getChildAt(0).requestFocus() else web.requestFocus()
     }
 
     private fun renderDiagnostics() {
@@ -122,7 +114,7 @@ class AgentActivity : Activity() {
         debugText.text = "DEBUG · ${info.optString("device")} · Android ${info.optString("android")}\n" +
             "WebView ${page.optString("webView", "unknown")} · 页面 ${page.optString("phase")} · 已连接手机 ${info.optInt("connectedPhones")}\n" +
             "桥接轮询 $poll · viewport ${page.optString("viewport", "未上报")} · revision ${page.optLong("revision", -1)}\n" +
-            "最近错误：${info.optString("lastError").ifBlank { "无" }}\n手机可在 Agent 设置中刷新、复制诊断报告；遥控器菜单键可切换 Debug。"
+            "最近错误：${info.optString("lastError").ifBlank { "无" }}\n请在手机 Agent → 电视显示中配置 Debug、刷新或复制诊断报告。"
     }
 
     override fun onResume() {
@@ -135,7 +127,6 @@ class AgentActivity : Activity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (keyCode == KeyEvent.KEYCODE_MENU && event.repeatCount == 0) { toggleDebug(!AgentDiagnostics.enabled); return true }
         if (!debugPanel.hasFocus() && (keyCode == KeyEvent.KEYCODE_DPAD_DOWN || keyCode == KeyEvent.KEYCODE_DPAD_UP)) {
             web.evaluateJavascript("if(window.agentScrollBy)window.agentScrollBy(${if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) 240 else -240})", null)
             return true
